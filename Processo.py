@@ -16,7 +16,16 @@ class Processo(Tarefa):
 
     def _atualizaThreadDict(self):
         tid_list = [name for name in os.listdir(f"/proc/{self._id}/task") if name.isdigit()]
-        self._threads = {int(tid): Thread(self._id, tid) for tid in tid_list}
+        # Deletar threads que nao estao mais ativas
+        for existing_tid in list(self._threads.keys()):
+            if existing_tid not in map(int, tid_list):
+                del self._threads[existing_tid]
+        # Atualizar threads ativas
+        for tid in tid_list:
+            if int(tid) not in self._threads:
+                self._threads[int(tid)] = Thread(tid=tid, pid=self._id)
+            else:
+                self._threads[int(tid)].atualizaDados()
         self._numThreads = len(self._threads)
     
     def getThreadDict(self):
