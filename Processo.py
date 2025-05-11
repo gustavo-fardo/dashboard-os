@@ -1,5 +1,6 @@
 from Tarefa import Tarefa
 from Thread import Thread
+import os
 
 class Processo(Tarefa):
     def __init__(self, pid):
