@@ -2,8 +2,8 @@ import ctypes
 import os
 libc = ctypes.CDLL("libc.so.6", use_errno=True)
 
+# /proc folder ref: https://man7.org/linux/man-pages/man5/proc.5.html
 PRIO_PROCESS = 0 # <linux/resource.h>
-PR_GET_NAME = 16 # <linux/prctl.h>
 
 class Tarefa():
     def __init__(self, id, prefixo="/proc"):
@@ -11,7 +11,7 @@ class Tarefa():
         self._prefixo = prefixo
         self._nome = None
         self._cpuUso = None
-        self._memUso = None # Não há informação de uso de memória por thread no Linux
+        self._memUso = None
         self._estado = None
         self._prioB = None
         self._prioD = None
@@ -86,6 +86,7 @@ class Tarefa():
 
     def _atualizaPrioD(self):
         # Prioridade dinâmica (NICE do linux), pela syscall getpriority
+        # REF: https://man7.org/linux/man-pages/man2/setpriority.2.html
         # Configuracao de chamada da funcao getpriority
         libc.getpriority.argtypes = [ctypes.c_int, ctypes.c_int]
         libc.getpriority.restype = ctypes.c_int
