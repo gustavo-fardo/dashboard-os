@@ -21,7 +21,6 @@ class Tarefa():
         self._atualizaPrioB()
         self._atualizaPrioD()
         self._atualizaEstado()
-        self._atualizaMem()
         self._atualizaCPU()
 
     def _atualizaCPU(self):
@@ -42,29 +41,6 @@ class Tarefa():
         total_time = utime + stime
         seconds = uptime - (starttime / clk_tck)
         self._cpuUso = 100 * ((total_time / clk_tck) / seconds)
-
-    def _atualizaMem(self):
-        # Metodo usado pelo comando "top" para calcular o uso de memoria
-        # PSS: Proportional Set Size
-        # O PSS é a quantidade de memória que um processo compartilha com 
-        # outros processos e pode ser encontrado somando o PSS de todas os
-        # mapeamentos de memoria do processo, disponiveis em /proc/[pid]/smaps
-        caminho_smaps = f"{self._prefixo}/{self._id}/smaps"
-        pss_total_kb = 0
-
-        try:
-            with open(caminho_smaps, 'r') as arquivo:
-                for linha in arquivo:
-                    if linha.startswith("Pss:"):
-                        partes = linha.split()
-                        if len(partes) >= 2: # Se ha valor de PSS (segundo campo)
-                            pss_total_kb += int(partes[1])
-        except FileNotFoundError:
-            print(f"A tarefa com ID {self._id} não existe ou o arquivo smaps não está disponível.")
-        except PermissionError:
-            print(f"Permissão negada ao acessar /proc/{self._id}/smaps. Tente executar como root.")
-        
-        self._memUso = pss_total_kb / 1024 # Convertendo para MB
 
     def _atualizaNome(self):
         # Nome: campo 1 do /proc/[tid]/comm
@@ -106,6 +82,9 @@ class Tarefa():
         with open(f'{self._prefixo}/{self._id}/stat', 'r') as f:
             fields = f.read().split()
             self._prioB = int(fields[17]) # Prioridade estática do processo
+    
+    def atualizaMem(self, mem):
+        self._memUso = mem
 
     def getID(self):
         return self._id

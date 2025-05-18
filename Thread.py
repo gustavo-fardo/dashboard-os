@@ -1,6 +1,6 @@
-from Tarefa import Tarefa  # Ensure Tarefa is a class in the Tarefa module
+from Tarefa import Tarefa
 
-class Thread(Tarefa):  # Ensure Tarefa is the correct base class
+class Thread(Tarefa): 
     def __init__(self, pid, tid):
         super().__init__(tid, f"/proc/{pid}/task")
         self._pid = pid
