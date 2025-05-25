@@ -7,7 +7,7 @@ from GerenciadorDados import GerenciadorDados
 import threading
 import time
 
-UI_UPDATE_TIME_MS = 5000
+UI_UPDATE_TIME_MS = 1000
 DATA_UPDATE_TIME_S = 0.5
 
 class Interface:
@@ -43,43 +43,46 @@ class Interface:
         process_ids = set()
         
         with self.gerenciador._dictlock:
-            proc_dict = self.gerenciador.getProcDict().copy()
+            proc_dict = dict(sorted(self.gerenciador.getProcDict().items(), key=lambda item: item[1].getCPU(), reverse=True))
+            # proc_dict = self.gerenciador.getProcDict().copy()
+
 
         for pid, process in proc_dict.items():
             proc_id = str(pid)
             process_ids.add(proc_id)
-            if f"proc_{proc_id}" in existing_items:
+            if proc_id in existing_items:
                 self.process_tree.item(
-                    f"proc_{proc_id}", text=proc_id, 
-                    values=(process.getNome(), process.getCPU(), process.getMem(), 
+                    proc_id, text=proc_id, 
+                    values=(process.getNome(), process.getUsuario(), process.getCPU(), process.getMem(), 
                             process.getEstado(), process.getPrioB(), process.getPrioD())
                 )
             else:
                 self.process_tree.insert(
-                    "", "end", iid=f"proc_{proc_id}" text=proc_id, 
-                    values=(process.getNome(), process.getCPU(), process.getMem(), 
+                    "", "end", iid=proc_id, text=proc_id, 
+                    values=(process.getNome(), process.getUsuario(), process.getCPU(), process.getMem(), 
                             process.getEstado(), process.getPrioB(), process.getPrioD())
                 )
 
             thread_ids = set()
             for tid, thread in process.getThreadDict().items():
+                tid = str(tid) + " (TID)" 
                 thread_ids.add(tid)
                 try:
                     self.process_tree.insert(
                         proc_id, "end", iid=tid,
                         text=f"{tid}",
-                        values=(thread.getNome(), thread.getCPU(), thread.getMem(), 
+                        values=(thread.getNome(), thread.getUsuario(), thread.getCPU(), thread.getMem(), 
                                 thread.getEstado(), thread.getPrioB(), thread.getPrioD())
                     )
                 except Exception as e:
                     self.process_tree.item(
                         tid,
                         text=f"{tid}",
-                        values=(thread.getNome(), thread.getCPU(), thread.getMem(), 
+                        values=(thread.getNome(), thread.getUsuario(), thread.getCPU(), thread.getMem(), 
                                 thread.getEstado(), thread.getPrioB(), thread.getPrioD())
                     )
                     
-            for child in self.process_tree.get_children(f"proc_{proc_id}"):
+            for child in self.process_tree.get_children(proc_id):
                 if child not in thread_ids:
                     self.process_tree.delete(child)
 
@@ -105,15 +108,18 @@ class Interface:
         
         self.process_tree = ttk.Treeview(self.frames["prc"])
 
-        self.process_tree["columns"] = ("name", "cpu", "memory", "state", "prioB", "prioD")
+        self.process_tree["columns"] = ("name", "user", "cpu", "memory", "state", "prioB", "prioD")
         self.process_tree.heading("#0", text="PID")
         self.process_tree.heading("name", text="Nome")
+        self.process_tree.heading("user", text="Usuário")
         self.process_tree.heading("cpu", text="CPU (%)")
         self.process_tree.heading("memory", text="Memory (MB)")
         self.process_tree.heading("state", text="State")
         self.process_tree.heading("prioB", text="PrioD")
         self.process_tree.heading("prioD", text="PrioB")
-        self.process_tree.column("name", width=200, anchor="center")
+        self.process_tree.column("#0", width=100, anchor="center")
+        self.process_tree.column("name", width=240, anchor="center")
+        self.process_tree.column("user", width=60, anchor="center")
         self.process_tree.column("cpu", width=60, anchor="center")
         self.process_tree.column("memory", width=80, anchor="center")
         self.process_tree.column("state", width=60, anchor="center")
@@ -168,7 +174,7 @@ class Interface:
         self.meters["memV"].pack(side="left", padx=10)
         
         cpu_labels = ["Uso",
-            "Ociosas",
+            f"Ociosas",
             "Sist.",
             "Usuario",
             "Nice",

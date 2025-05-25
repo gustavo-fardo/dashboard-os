@@ -9,25 +9,6 @@ import threading
 libc = ctypes.CDLL(ctypes.util.find_library("c"))
 user_uid = os.getuid()
 
-# Como a struct sysinfo usada em C para obter informacoes de memoria pela syscall sysinfo
-class Sysinfo(ctypes.Structure):
-    _fields_ = [
-        ("uptime", ctypes.c_long),
-        ("loads", ctypes.c_ulong * 3),
-        ("totalram", ctypes.c_ulong),
-        ("freeram", ctypes.c_ulong),
-        ("sharedram", ctypes.c_ulong),
-        ("bufferram", ctypes.c_ulong),
-        ("totalswap", ctypes.c_ulong),
-        ("freeswap", ctypes.c_ulong),
-        ("procs", ctypes.c_ushort),
-        ("pad", ctypes.c_ushort),
-        ("totalhigh", ctypes.c_ulong),
-        ("freehigh", ctypes.c_ulong),
-        ("mem_unit", ctypes.c_uint),
-        ("_f", ctypes.c_char * (20 - 2 * ctypes.sizeof(ctypes.c_long) - ctypes.sizeof(ctypes.c_int)))
-    ]
-
 class GerenciadorDados():
     def __init__(self):
         self._processos = {}
@@ -50,9 +31,9 @@ class GerenciadorDados():
         self._cpuSoftIrq = None
         self._numProcessos = None
         self._numThreads = None
-        threading.Thread(target=self.atualizaDados, args=(True,), daemon=True).start()
         self._dictlock = threading.Lock()
         self.atualizaDados(True)
+        threading.Thread(target=self.atualizaDados, args=(True,), daemon=True).start()
 
     def atualizaDados(self, total=False):
         with self._dictlock:
@@ -61,21 +42,11 @@ class GerenciadorDados():
         self._atualizaCPUInfo()
 
     def _atualizaProcDict(self):
-        pid_list = []
-        for name in os.listdir("/proc"):
-            if name.isdigit():
-                try:
-                    with open(f"/proc/{name}/status") as f:
-                        for line in f:
-                            if line.startswith("Uid:"):
-                                uid = int(line.split()[1])  # Real UID
-                                if uid == user_uid:
-                                    # print(f"Processo: {name}")
-                                    # print(uid)
-                                    pid_list.append(name)
-                                break
-                except (FileNotFoundError, PermissionError):
-                    continue
+        try:
+            pid_list = [name for name in os.listdir(f"/proc/") if name.isdigit()]
+        except Exception as e:
+            print(f"Error reading task directory: {e}")
+            pid_list = []
         # Deletar processos que nao estao mais ativos
         for existing_pid in list(self._processos.keys()):
             if existing_pid not in map(int, pid_list):
@@ -86,13 +57,17 @@ class GerenciadorDados():
                 if int(pid) not in self._processos:
                     self._processos[int(pid)] = Processo(pid)
                 else:
-                    self._processos[int(pid)]
+                    self._processos[int(pid)].atualizaDados()
             elif int(pid) in self._processos:
                 del self._processos[int(pid)]
         self._numProcessos = len(self._processos)
 
     def _atualizaMemInfo(self, total=False):
         # Método utilizado pelo "top" para calcular o uso de memória
+        # Utiliza informacoes do /proc/meminfo
+        # Memoria Fisica: campos MemTotal, MemFree, Buffers, Cached e SReclaimable
+        # Memoria Virtual: campos CommitLimit, Committed_AS e VmallocUsed
+        # REF: https://stackoverflow.com/questions/16726779/how-do-i-get-the-total-memory-usage-of-an-application-from-proc-pid-stat
         meminfo = {}
         try:
             with open('/proc/meminfo', 'r') as f:
@@ -126,6 +101,8 @@ class GerenciadorDados():
         self._memVirtualLivre = self._memVirtualTotal - self._memVirtualUso
 
     def _atualizaCPUInfo(self):
+        # Captura a variacao do uso de CPU em 1s acessando /proc/stat 
+        # pelos campos user, nice, system, idle, iowait, irq, softirq
         # REF: https://www.idnt.net/en-GB/kb/941772
         def ler_cpu_tempos():
             with open('/proc/stat', 'r') as f:

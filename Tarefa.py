@@ -1,5 +1,6 @@
 import ctypes
 import os
+import pwd
 libc = ctypes.CDLL("libc.so.6", use_errno=True)
 
 # /proc folder ref: https://man7.org/linux/man-pages/man5/proc.5.html
@@ -10,12 +11,14 @@ class Tarefa():
         self._id = id
         self._prefixo = prefixo
         self._nome = None
+        self._usuario = None
         self._cpuUso = None
         self._memUso = None
         self._estado = None
         self._prioB = None
         self._prioD = None
         self._atualizaNome()
+        self._atualizaUsuario()
 
     def atualizaDados(self):
         self._atualizaPrioB()
@@ -53,6 +56,13 @@ class Tarefa():
                 self._nome = f.read().strip()
         except FileNotFoundError:
             print(f"A tarefa com ID {self._id} não existe ou o arquivo comm não está disponível.")
+
+    def _atualizaUsuario(self):
+        # Usuario: campo 1 do /proc/[tid]/status
+        with open(f"/proc/{self._id}/status") as f:
+                        for line in f:
+                            if line.startswith("Uid:"):
+                                self._usuario = pwd.getpwuid(int(line.split()[1])).pw_name  # Real UID
 
     def _atualizaEstado(self):
         # Estado: campo 2 do /proc/[tid]/stat
@@ -100,8 +110,11 @@ class Tarefa():
     def getNome(self):
         return self._nome
     
+    def getUsuario(self):
+        return self._usuario
+    
     def getCPU(self):
-        return self._cpuUso
+        return round(self._cpuUso, 2)
     
     def getMem(self):    
         return self._memUso
