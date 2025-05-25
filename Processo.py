@@ -21,7 +21,11 @@ class Processo(Tarefa):
         self._atualizaThreadDict()
 
     def _atualizaThreadDict(self):
-        tid_list = [name for name in os.listdir(f"/proc/{self._id}/task") if name.isdigit()]
+        try:
+            tid_list = [name for name in os.listdir(f"/proc/{self._id}/task") if name.isdigit()]
+        except Exception as e:
+            tid_list = []
+            
         # Deletar threads que nao estao mais ativas
         for existing_tid in list(self._threads.keys()):
             if existing_tid not in map(int, tid_list):
@@ -37,11 +41,15 @@ class Processo(Tarefa):
 
     def _atualizaMemProcesso(self):
         # Dados de memoria do processo (statm do processo, com memoria virtual e RSS)
-        with open(f"/proc/{self._id}/statm") as f:
-            process_pages = list(map(int, f.read().split()))
-        page_size = os.sysconf(os.sysconf_names['SC_PAGE_SIZE']) // 1024  # KB
-        self._memVirtualUso = process_pages[0] * page_size  # Converte paginas virtuais para KB
-        self._memUso = process_pages[1] * page_size  # Converte paginas do RSS para KB
+        try:
+            with open(f"/proc/{self._id}/statm") as f:
+                process_pages = list(map(int, f.read().split()))
+            page_size = os.sysconf(os.sysconf_names['SC_PAGE_SIZE']) // 1024  # KB
+            self._memVirtualUso = process_pages[0] * page_size  # Converte paginas virtuais para KB
+            self._memUso = process_pages[1] * page_size  # Converte paginas do RSS para KB
+        except Exception as e:
+            self._memVirtualUso = 0
+            self._memUso = 0
 
         segment_patterns = {
             'text': r'^[0-9a-f].* r-xp.*\.so|\.py|bin/',
@@ -82,22 +90,25 @@ class Processo(Tarefa):
         task_dir = f"/proc/{self._id}/task"
         total_stacks_kb = 0
         
-        for tid in os.listdir(task_dir):
-            stack_kb = 0
-            try:
-                # [stack] em /maps
-                with open(f"{task_dir}/{tid}/maps") as f:
-                    for line in f:
-                        if '[stack]' in line:
-                            start, end = line.split()[0].split('-')
-                            stack_kb = (int(end, 16) - int(start, 16)) // 1024
-                            total_stacks_kb += stack_kb
-                            break
-            except IOError:
-                continue
+        try:
+            for tid in os.listdir(task_dir):
+                stack_kb = 0
+                try:
+                    # [stack] em /maps
+                    with open(f"{task_dir}/{tid}/maps") as f:
+                        for line in f:
+                            if '[stack]' in line:
+                                start, end = line.split()[0].split('-')
+                                stack_kb = (int(end, 16) - int(start, 16)) // 1024
+                                total_stacks_kb += stack_kb
+                                break
+                except IOError:
+                    continue
+                
+                thread_data[tid] = {'stack_kb': stack_kb}
+        except Exception as e:
+            print(1)
             
-            thread_data[tid] = {'stack_kb': stack_kb}
-        
         # Calcula memoria compartilhada total (total menos as stacks)
         shared_kb = max(0, total_process_kb - total_stacks_kb)
         num_threads = len(thread_data)

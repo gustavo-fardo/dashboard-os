@@ -3,20 +3,32 @@ from ttkbootstrap import Style
 from ttkbootstrap.widgets import Meter, LabelFrame
 from tkinter import ttk
 from Chart import AreaChartFrame
-import GerenciadorDados
-import Processo
+from GerenciadorDados import GerenciadorDados
+from Processo import Processo
+import threading
+import time
 
 UPDATE_TIME_MS = 1000
+dict_lock = threading.Lock()
 
 class Interface:
     def __init__(self):
         self.style = Style(theme="cyborg")
         self.root = self.style.master
         self.root.title("Linux System Overview - Mocked")
-        self.root.state('zoomed')
-        self.root.resizable(True, True)
+        self.root.resizable(False, True)
+        self.root.geometry("1200x800")
+        self.root.minsize(1000, 800)
+        
+
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.gerenciador = GerenciadorDados()
+        
+        self.atualiza_thread_running = True
+
+        self.atualiza_thread = threading.Thread(target=self.atualiza_thread_func, daemon=True)
+        self.atualiza_thread.start()
 
         self.clear_widgets()
         self.resources_draw()
@@ -27,8 +39,11 @@ class Interface:
     def process_update(self):
         existing_items = set(self.process_tree.get_children())
         process_ids = set()
+        
+        with dict_lock:
+            proc_dict = self.gerenciador.getProcDict().copy()
 
-        for pid, processo in self.gerenciador.getProcDict().items():
+        for pid, processo in proc_dict.items():
             process = Processo(pid)
             proc_id = str(process.getID())
             process_ids.add(proc_id)
@@ -47,18 +62,19 @@ class Interface:
 
             thread_ids = set()
             for tid, thread in processo.getThreadDict().items():
+                tid = "tid-" + str(tid)
                 thread_ids.add(tid)
-                if tid in self.process_tree.get_children(proc_id):
-                        self.process_tree.item(
-                        tid,
-                        text=f"Thread: {thread.getNome()} (TID: {tid})",
+                try:
+                    self.process_tree.insert(
+                        proc_id, "end", iid=tid,
+                        text=f"{tid}",
                         values=(thread.getNome(), thread.getCPU(), thread.getMem(), 
                                 thread.getEstado(), thread.getPrioB(), thread.getPrioD())
                     )
-                else:
-                    self.process_tree.insert(
-                        proc_id, "end", iid=tid,
-                        text=f"Thread: {thread.getNome()} (TID: {tid})",
+                except Exception as e:
+                    self.process_tree.item(
+                        tid,
+                        text=f"{tid}",
                         values=(thread.getNome(), thread.getCPU(), thread.getMem(), 
                                 thread.getEstado(), thread.getPrioB(), thread.getPrioD())
                     )
@@ -78,18 +94,25 @@ class Interface:
         process_button = ttk.Button(self.root, text="View Resources", command=self.redraw_resources)
         process_button.pack(pady=10)
 
-        self.frames["prc"].pack(fill="both", padx=10, pady=5)
+        self.frames["prc"].pack(fill="both", expand=True, padx=10, pady=5)
+
+        tree_scrollbar = ttk.Scrollbar(self.frames["prc"], orient="vertical")
+        tree_scrollbar.pack(side="right", fill="y")
+
+        self.process_tree = ttk.Treeview(self.frames["prc"], yscrollcommand=tree_scrollbar.set)
+        tree_scrollbar.config(command=self.process_tree.yview)
+        
         self.process_tree = ttk.Treeview(self.frames["prc"])
 
         self.process_tree["columns"] = ("name", "cpu", "memory", "state", "prioB", "prioD")
         self.process_tree.heading("#0", text="PID")
         self.process_tree.heading("name", text="Nome")
-        self.process_tree.heading("cpu", text="CPU")
-        self.process_tree.heading("memory", text="Memory")
+        self.process_tree.heading("cpu", text="CPU (%)")
+        self.process_tree.heading("memory", text="Memory (MB)")
         self.process_tree.heading("state", text="State")
         self.process_tree.heading("prioB", text="PrioD")
         self.process_tree.heading("prioD", text="PrioB")
-        self.process_tree.column("name", width=60, anchor="center")
+        self.process_tree.column("name", width=200, anchor="center")
         self.process_tree.column("cpu", width=60, anchor="center")
         self.process_tree.column("memory", width=80, anchor="center")
         self.process_tree.column("state", width=60, anchor="center")
@@ -99,15 +122,13 @@ class Interface:
 
         self.process_update()
 
-    def resources_update(self):
-        self.gerenciador.atualizaDados()
-        
-        self.meters["cpu"].configure(amounttotal=self.gerenciador._cpuSistema, amountused=self.gerenciador._cpuUso)
+    def resources_update(self):        
+        self.meters["cpu"].configure(amounttotal=100, amountused=self.gerenciador._cpuUso)
         self.meters["mem"].configure(amounttotal=self.gerenciador._memTotal, amountused=self.gerenciador._memUso)
         self.meters["memV"].configure(amounttotal=self.gerenciador._memVirtualTotal, amountused=self.gerenciador._memVirtualUso)
 
         
-        self.cpu_chart_frame.update_chart(self.gerenciador._cpuUso, self.gerenciador._cpuSistema)
+        self.cpu_chart_frame.update_chart(self.gerenciador._cpuUso, 100)
         self.mem_chart_frame.update_chart(self.gerenciador._memUso, self.gerenciador._memTotal)
         self.memV_chart_frame.update_chart(self.gerenciador._memVirtualUso, self.gerenciador._memVirtualTotal)
 
@@ -163,6 +184,19 @@ class Interface:
             "memV": Meter(self.frames["memV"], metertype="semi", textright='mb',
                   bootstyle="light", subtext='Virtual Memory')
         }
+
+    def on_close(self):
+        self.atualiza_thread_running = False
+        if self.atualiza_thread.is_alive():
+            self.atualiza_thread.join(timeout=1)
+        self.root.destroy()
+    
+    def atualiza_thread_func(self):
+        while self.atualiza_thread_running:
+            with dict_lock:
+                self.gerenciador.atualizaDados()
+            time.sleep(0.5)
+            
 
 if __name__ == "__main__":
     app = Interface()

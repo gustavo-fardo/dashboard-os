@@ -57,8 +57,6 @@ class GerenciadorDados():
 
     def _atualizaProcDict(self):
         pid_list = [name for name in os.listdir(f"/proc/") if name.isdigit()]
-        pid_list = [12089]
-        print (f"PID List: {pid_list}")
         # Deletar processos que nao estao mais ativos
         for existing_pid in list(self._processos.keys()):
             if existing_pid not in map(int, pid_list):
