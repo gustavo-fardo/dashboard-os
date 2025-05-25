@@ -107,7 +107,7 @@ class Processo(Tarefa):
                 
                 thread_data[tid] = {'stack_kb': stack_kb}
         except Exception as e:
-            print(1)
+            pass
             
         # Calcula memoria compartilhada total (total menos as stacks)
         shared_kb = max(0, total_process_kb - total_stacks_kb)

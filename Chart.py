@@ -4,13 +4,12 @@ from ttkbootstrap import Style
 from PIL import Image, ImageTk, ImageDraw
 
 class AreaChartFrame:
-    def __init__(self, parent, chart_name, fill, width=400, height=200):
+    def __init__(self, parent, chart_name, num_lines=2, labels=None, width=400, height=200):
         self.style = Style(theme="cyborg")
         self.root = self.style.master
         self.parent = parent
         self.width = width
         self.height = height
-        self.values = []
         self.max_values = 50
         self.max_value = 100
         
@@ -19,7 +18,18 @@ class AreaChartFrame:
         self.top_pad = 20
         self.bottom_pad = 30
         
-        self.fill_color = fill
+        self.num_lines = num_lines
+
+        self.values = [[] for _ in range(num_lines)]
+        self.colors = [
+            '#d5d5d5', '#4fb3ff', '#ff4f81', '#4fff81', '#ffb34f', '#b34fff',
+            '#ffd24f', '#4fffff', '#ff4fff', '#7f7fff'
+        ]
+
+        if labels is not None and len(labels) == num_lines:
+            self.line_labels = labels
+        else:
+            self.line_labels = [f"Line {i+1}" for i in range(num_lines)]
 
         self.frame = ttk.Frame(parent, padding="5")
         self.frame.pack()
@@ -29,15 +39,31 @@ class AreaChartFrame:
         
         self.chart_canvas = tk.Canvas(self.frame, width=width, height=height, bg='black')
         self.chart_canvas.pack()
+
+        self.legend_frame = ttk.Frame(self.frame)
+        self.legend_frame.pack(pady=(5, 0))
+        self._draw_legend()
+
+        self.update_chart([0]*num_lines, 100)
+
+    def _draw_legend(self):
+        for widget in self.legend_frame.winfo_children():
+            widget.destroy()
+        for idx, label in enumerate(self.line_labels):
+            color_canvas = tk.Canvas(self.legend_frame, width=20, height=15, bg='black', highlightthickness=0)
+            color_canvas.create_rectangle(0, 0, 20, 15, fill=self.colors[idx], outline='white')
+            color_canvas.pack(side="left", padx=(5, 2))
+            
+            label_widget = ttk.Label(self.legend_frame, text=label)
+            label_widget.pack(side="left", padx=(0, 10))
+
+    def update_chart(self, current_values, max_value):
+        self.max_value = max([max_value] + current_values + [10])
         
-        self.update_chart(0, 100)
-    
-    def update_chart(self, current_value, max_value):
-        self.max_value = max(max_value, current_value, 10)
-        
-        if len(self.values) >= self.max_values:
-            self.values.pop(0)
-        self.values.append(current_value)
+        for i, val in enumerate(current_values):
+            if len(self.values[i]) >= self.max_values:
+                self.values[i].pop(0)
+            self.values[i].append(val)
         
         img = Image.new('RGB', (self.width, self.height), 'black')
         draw = ImageDraw.Draw(img)
@@ -55,23 +81,22 @@ class AreaChartFrame:
         for i in range(0, 11):
             value = self.max_value * i // 10
             y = chart_bottom - (i * chart_height // 10)
-            
             draw.line([(chart_left, y), (chart_right, y)], fill="#000000")
-            
             draw.text((5, y - 10), f"{value}", fill='white')
-            
-        if len(self.values) > 1:
-            points = []
-            for i, value in enumerate(self.values):
-                x = chart_left + (i * chart_width // (self.max_values - 1))
-                y = chart_bottom - (value * chart_height / self.max_value)
-                points.append((x, y))
-            
-            
-            points.append((points[-1][0], chart_bottom))
-            points.append((points[0][0], chart_bottom))
-            
-            draw.polygon(points, fill=self.fill_color, outline="#d5d5d5")
-            
+        
+        for idx, line_values in enumerate(self.values):
+            if len(line_values) > 1:
+                points = []
+                for i, value in enumerate(line_values):
+                    x = chart_left + (i * chart_width // (self.max_values - 1))
+                    y = chart_bottom - (value * chart_height / self.max_value)
+                    points.append((x, y))
+                
+                draw.line(points, fill=self.colors[idx], width=2)
+        
         self.photo = ImageTk.PhotoImage(img)
+        
+        if not self.chart_canvas.winfo_exists():
+            return
+        
         self.chart_canvas.create_image(0, 0, anchor='nw', image=self.photo)

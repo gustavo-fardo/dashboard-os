@@ -4,22 +4,21 @@ from ttkbootstrap.widgets import Meter, LabelFrame
 from tkinter import ttk
 from Chart import AreaChartFrame
 from GerenciadorDados import GerenciadorDados
-from Processo import Processo
 import threading
 import time
 
-UPDATE_TIME_MS = 1000
-dict_lock = threading.Lock()
+UI_UPDATE_TIME_MS = 5000
+DATA_UPDATE_TIME_S = 0.5
 
 class Interface:
     def __init__(self):
         self.style = Style(theme="cyborg")
         self.root = self.style.master
-        self.root.title("Linux System Overview - Mocked")
-        self.root.resizable(False, True)
-        self.root.geometry("1200x800")
-        self.root.minsize(1000, 800)
-        
+        self.root.title("Dashboard-OS")
+        self.root.resizable(True, True)
+        self.root.attributes('-zoomed', True)
+        self.root.minsize(1000, 1000)
+        self.cur_screen = ""
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -37,31 +36,33 @@ class Interface:
         self.root.mainloop()
 
     def process_update(self):
+        if not self.process_tree.winfo_exists():
+            return 
+        
         existing_items = set(self.process_tree.get_children())
         process_ids = set()
         
-        with dict_lock:
+        with self.gerenciador._dictlock:
             proc_dict = self.gerenciador.getProcDict().copy()
 
-        for pid, processo in proc_dict.items():
-            process = Processo(pid)
-            proc_id = str(process.getID())
+        for pid, process in proc_dict.items():
+            proc_id = str(pid)
             process_ids.add(proc_id)
             if proc_id in existing_items:
                 self.process_tree.item(
-                    proc_id, text=process.getID(), 
+                    proc_id, text=proc_id, 
                     values=(process.getNome(), process.getCPU(), process.getMem(), 
                             process.getEstado(), process.getPrioB(), process.getPrioD())
                 )
             else:
                 self.process_tree.insert(
-                    "", "end", iid=proc_id, text=process.getID(), 
+                    "", "end", iid=proc_id, text=proc_id, 
                     values=(process.getNome(), process.getCPU(), process.getMem(), 
                             process.getEstado(), process.getPrioB(), process.getPrioD())
                 )
 
             thread_ids = set()
-            for tid, thread in processo.getThreadDict().items():
+            for tid, thread in process.getThreadDict().items():
                 tid = "tid-" + str(tid)
                 thread_ids.add(tid)
                 try:
@@ -88,9 +89,10 @@ class Interface:
                 self.process_tree.delete(item)
 
         self.root.update()
-        self.root.after(UPDATE_TIME_MS, self.process_update)
+        self.root.after(UI_UPDATE_TIME_MS, self.process_update)
 
     def process_draw(self):
+        self.cur_screen = "process"
         process_button = ttk.Button(self.root, text="View Resources", command=self.redraw_resources)
         process_button.pack(pady=10)
 
@@ -128,14 +130,32 @@ class Interface:
         self.meters["memV"].configure(amounttotal=self.gerenciador._memVirtualTotal, amountused=self.gerenciador._memVirtualUso)
 
         
-        self.cpu_chart_frame.update_chart(self.gerenciador._cpuUso, 100)
-        self.mem_chart_frame.update_chart(self.gerenciador._memUso, self.gerenciador._memTotal)
-        self.memV_chart_frame.update_chart(self.gerenciador._memVirtualUso, self.gerenciador._memVirtualTotal)
+        self.cpu_chart_frame.update_chart(
+            [self.gerenciador._cpuUso,
+            self.gerenciador._cpuOcioso,
+            self.gerenciador._cpuSistema,
+            self.gerenciador._cpuUsuario,
+            self.gerenciador._cpuNice,
+            self.gerenciador._cpuWait,
+            self.gerenciador._cpuIrq,
+            self.gerenciador._cpuSoftIrq], 100)
+        
+        self.mem_chart_frame.update_chart([
+            self.gerenciador._memLivre,
+            self.gerenciador._memUso,
+            self.gerenciador._memBuffer,
+            self.gerenciador._memCache], self.gerenciador._memTotal)
+        
+        self.memV_chart_frame.update_chart([
+                self.gerenciador._memVirtualUso,
+                self.gerenciador._memVirtualKernelUso
+            ], self.gerenciador._memVirtualTotal)
 
         self.root.update()
-        self.root.after(UPDATE_TIME_MS, self.resources_update)
+        self.root.after(UI_UPDATE_TIME_MS, self.resources_update)
 
     def resources_draw(self):
+        self.cur_screen = "resources"
         process_button = ttk.Button(self.root, text="View Processes", command=self.redraw_processes)
         process_button.pack(pady=10)
 
@@ -147,15 +167,35 @@ class Interface:
         
         self.frames["memV"].pack(fill="x", padx=10)
         self.meters["memV"].pack(side="left", padx=10)
+        
+        cpu_labels = ["Uso",
+            "Ociosas",
+            "Sist.",
+            "Usuario",
+            "Nice",
+            "Wait",
+            "Irq",
+            "Soft Irq"
+        ]
 
-        self.cpu_chart_frame = AreaChartFrame(self.frames["cpu"], "CPU Usage (%)", '#6e4ac9')
-        self.mem_chart_frame = AreaChartFrame(self.frames["mem"], "Memory Usage (MB)", '#4fb3ff')
-        self.memV_chart_frame = AreaChartFrame(self.frames["memV"], "Virtual Memory Usage (MB)", '#767676')
+        mem_labels = [
+            "Livre",
+            "Uso",
+            "Buffer",
+            "Cache"
+        ]
+        
+        memV_labels = [
+            "Uso",
+            "Kernel Uso"
+        ]
+
+        self.cpu_chart_frame = AreaChartFrame(self.frames["cpu"], "CPU Usage (%)", 8, cpu_labels)
+        self.mem_chart_frame = AreaChartFrame(self.frames["mem"], "Memory Usage (MB)", 4, mem_labels)
+        self.memV_chart_frame = AreaChartFrame(self.frames["memV"], "Virtual Memory Usage (MB)", 2, memV_labels)
 
         self.resources_update()
 
-    def update_chart(self, chart_frame, value, max_value):
-        chart_frame.update_chart(value, max_value)
 
     def redraw_processes(self):
         self.clear_widgets()
@@ -193,9 +233,12 @@ class Interface:
     
     def atualiza_thread_func(self):
         while self.atualiza_thread_running:
-            with dict_lock:
-                self.gerenciador.atualizaDados()
-            time.sleep(0.5)
+            if self.cur_screen == "resources":
+                self.gerenciador._atualizaMemInfo()
+                self.gerenciador._atualizaCPUInfo()
+            else:
+                self.gerenciador._atualizaProcDict()
+            time.sleep(DATA_UPDATE_TIME_S)
             
 
 if __name__ == "__main__":

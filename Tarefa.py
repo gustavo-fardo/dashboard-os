@@ -52,7 +52,7 @@ class Tarefa():
             with open(f"{self._prefixo}/{self._id}/comm", "r") as f:
                 self._nome = f.read().strip()
         except FileNotFoundError:
-            print(f"A tarefa com ID {id} não existe ou o arquivo comm não está disponível.")
+            print(f"A tarefa com ID {self._id} não existe ou o arquivo comm não está disponível.")
 
     def _atualizaEstado(self):
         # Estado: campo 2 do /proc/[tid]/stat
