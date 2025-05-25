@@ -4,8 +4,10 @@ import ctypes
 import ctypes.util
 import time
 import sys
+import threading
 # Load the C standard library
 libc = ctypes.CDLL(ctypes.util.find_library("c"))
+user_uid = os.getuid()
 
 # Como a struct sysinfo usada em C para obter informacoes de memoria pela syscall sysinfo
 class Sysinfo(ctypes.Structure):
@@ -48,7 +50,7 @@ class GerenciadorDados():
         self._cpuSoftIrq = None
         self._numProcessos = None
         self._numThreads = None
-        self.atualizaDados(True)
+        threading.Thread(target=self.atualizaDados, args=(True,), daemon=True).start()
 
     def atualizaDados(self, total=False):
         self._atualizaProcDict()
@@ -56,19 +58,34 @@ class GerenciadorDados():
         self._atualizaCPUInfo()
 
     def _atualizaProcDict(self):
-        pid_list = [name for name in os.listdir(f"/proc/") if name.isdigit()]
-        pid_list = [12089]
-        print (f"PID List: {pid_list}")
+        pid_list = []
+        for name in os.listdir("/proc"):
+            if name.isdigit():
+                try:
+                    with open(f"/proc/{name}/status") as f:
+                        for line in f:
+                            if line.startswith("Uid:"):
+                                uid = int(line.split()[1])  # Real UID
+                                if uid == user_uid:
+                                    # print(f"Processo: {name}")
+                                    # print(uid)
+                                    pid_list.append(name)
+                                break
+                except (FileNotFoundError, PermissionError):
+                    continue
         # Deletar processos que nao estao mais ativos
         for existing_pid in list(self._processos.keys()):
             if existing_pid not in map(int, pid_list):
                 del self._processos[existing_pid]
         # Atualizar processos ativos
         for pid in pid_list:
-            if int(pid) not in self._processos:
-                self._processos[int(pid)] = Processo(pid)
-            else:
-                self._processos[int(pid)].atualizaDadosProcesso()
+            if os.path.exists(f"/proc/{pid}"):
+                if int(pid) not in self._processos:
+                    self._processos[int(pid)] = Processo(pid)
+                else:
+                    self._processos[int(pid)]
+            elif int(pid) in self._processos:
+                del self._processos[int(pid)]
         self._numProcessos = len(self._processos)
 
     def _atualizaMemInfo(self, total=False):

@@ -3,17 +3,18 @@ from ttkbootstrap import Style
 from ttkbootstrap.widgets import Meter, LabelFrame
 from tkinter import ttk
 from Chart import AreaChartFrame
-import GerenciadorDados
-import Processo
+from GerenciadorDados import GerenciadorDados
+from Processo import Processo
 
-UPDATE_TIME_MS = 1000
+UPDATE_TIME_MS = 500
 
 class Interface:
     def __init__(self):
         self.style = Style(theme="cyborg")
         self.root = self.style.master
         self.root.title("Linux System Overview - Mocked")
-        self.root.state('zoomed')
+        self.root.attributes('-zoomed', True)
+        # self.root.state('zoomed')
         self.root.resizable(True, True)
 
         self.gerenciador = GerenciadorDados()
@@ -28,27 +29,27 @@ class Interface:
         existing_items = set(self.process_tree.get_children())
         process_ids = set()
 
-        for pid, processo in self.gerenciador.getProcDict().items():
-            process = Processo(pid)
-            proc_id = str(process.getID())
+        for proc_id, process in self.gerenciador.getProcDict().items():
+            proc_id = str(proc_id) 
             process_ids.add(proc_id)
-            if proc_id in existing_items:
+            if f"proc_{proc_id}" in existing_items:
                 self.process_tree.item(
-                    proc_id, text=process.getID(), 
+                    f"proc_{proc_id}", text=process.getID(), 
                     values=(process.getNome(), process.getCPU(), process.getMem(), 
                             process.getEstado(), process.getPrioB(), process.getPrioD())
                 )
             else:
                 self.process_tree.insert(
-                    "", "end", iid=proc_id, text=process.getID(), 
+                    "", "end", iid=f"proc_{proc_id}", text=process.getID(), 
                     values=(process.getNome(), process.getCPU(), process.getMem(), 
                             process.getEstado(), process.getPrioB(), process.getPrioD())
                 )
 
             thread_ids = set()
-            for tid, thread in processo.getThreadDict().items():
+            for tid, thread in process.getThreadDict().items():
+                tid = str(tid)
                 thread_ids.add(tid)
-                if tid in self.process_tree.get_children(proc_id):
+                if tid in self.process_tree.get_children(f"proc_{proc_id}"):
                         self.process_tree.item(
                         tid,
                         text=f"Thread: {thread.getNome()} (TID: {tid})",
@@ -57,13 +58,13 @@ class Interface:
                     )
                 else:
                     self.process_tree.insert(
-                        proc_id, "end", iid=tid,
+                        f"proc_{proc_id}", "end", iid=tid,
                         text=f"Thread: {thread.getNome()} (TID: {tid})",
                         values=(thread.getNome(), thread.getCPU(), thread.getMem(), 
                                 thread.getEstado(), thread.getPrioB(), thread.getPrioD())
                     )
                     
-            for child in self.process_tree.get_children(proc_id):
+            for child in self.process_tree.get_children(f"proc_{proc_id}"):
                 if child not in thread_ids:
                     self.process_tree.delete(child)
 

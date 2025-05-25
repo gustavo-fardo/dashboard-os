@@ -4,6 +4,7 @@ import os
 import math
 import re
 from collections import defaultdict
+user_uid = os.getuid()
 
 class Processo(Tarefa):
     def __init__(self, pid):
@@ -21,7 +22,19 @@ class Processo(Tarefa):
         self._atualizaThreadDict()
 
     def _atualizaThreadDict(self):
-        tid_list = [name for name in os.listdir(f"/proc/{self._id}/task") if name.isdigit()]
+        tid_list = []
+        for name in os.listdir(f"/proc/{self._id}/task"):
+            if name.isdigit():
+                try:
+                    with open(f"/proc/{self._id}/task/{name}/status") as f:
+                        for line in f:
+                            if line.startswith("Uid:"):
+                                uid = int(line.split()[1])  # Real UID
+                                if uid == user_uid:
+                                    tid_list.append(name)
+                                break
+                except (FileNotFoundError, PermissionError):
+                    continue
         # Deletar threads que nao estao mais ativas
         for existing_tid in list(self._threads.keys()):
             if existing_tid not in map(int, tid_list):
