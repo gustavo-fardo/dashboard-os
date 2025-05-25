@@ -3,7 +3,8 @@ from ttkbootstrap import Style
 from ttkbootstrap.widgets import Meter, LabelFrame
 from tkinter import ttk
 from Chart import AreaChartFrame
-from data import *
+import GerenciadorDados
+import Processo
 
 UPDATE_TIME_MS = 1000
 
@@ -15,6 +16,8 @@ class Interface:
         self.root.state('zoomed')
         self.root.resizable(True, True)
 
+        self.gerenciador = GerenciadorDados()
+
         self.clear_widgets()
         self.resources_draw()
 
@@ -22,40 +25,42 @@ class Interface:
         self.root.mainloop()
 
     def process_update(self):
-        processes = get_processes()
-
         existing_items = set(self.process_tree.get_children())
         process_ids = set()
 
-        for process in processes["processos"]:
-            proc_id = str(process['id'])
+        for pid, processo in self.gerenciador.getProcDict().items():
+            process = Processo(pid)
+            proc_id = str(process.getID())
             process_ids.add(proc_id)
             if proc_id in existing_items:
                 self.process_tree.item(
-                    proc_id, text=process['id'], 
-                    values=(process["nome"], process["cpuUso"], process["memUso"], process.get("prioB", ""), process.get("prioD", ""))
+                    proc_id, text=process.getID(), 
+                    values=(process.getNome(), process.getCPU(), process.getMem(), 
+                            process.getEstado(), process.getPrioB(), process.getPrioD())
                 )
             else:
                 self.process_tree.insert(
-                    "", "end", iid=proc_id, text=process['id'], 
-                    values=(process["nome"], process["cpuUso"], process["memUso"], process.get("prioB", ""), process.get("prioD", ""))
+                    "", "end", iid=proc_id, text=process.getID(), 
+                    values=(process.getNome(), process.getCPU(), process.getMem(), 
+                            process.getEstado(), process.getPrioB(), process.getPrioD())
                 )
 
             thread_ids = set()
-            for thread in process.get("threads", []):
-                tid = str(thread['tid'])
+            for tid, thread in processo.getThreadDict().items():
                 thread_ids.add(tid)
                 if tid in self.process_tree.get_children(proc_id):
                         self.process_tree.item(
                         tid,
-                        text=f"Thread: {thread['nome']} (TID: {thread['tid']})",
-                        values=(thread["nome"], thread["cpuUso"], thread["memUso"], thread.get("prioB", ""), thread.get("prioD", ""))
+                        text=f"Thread: {thread.getNome()} (TID: {tid})",
+                        values=(thread.getNome(), thread.getCPU(), thread.getMem(), 
+                                thread.getEstado(), thread.getPrioB(), thread.getPrioD())
                     )
                 else:
                     self.process_tree.insert(
                         proc_id, "end", iid=tid,
-                        text=f"Thread: {thread['nome']} (TID: {thread['tid']})",
-                        values=(thread["nome"], thread["cpuUso"], thread["memUso"], thread.get("prioB", ""), thread.get("prioD", ""))
+                        text=f"Thread: {thread.getNome()} (TID: {tid})",
+                        values=(thread.getNome(), thread.getCPU(), thread.getMem(), 
+                                thread.getEstado(), thread.getPrioB(), thread.getPrioD())
                     )
                     
             for child in self.process_tree.get_children(proc_id):
@@ -76,16 +81,18 @@ class Interface:
         self.frames["prc"].pack(fill="both", padx=10, pady=5)
         self.process_tree = ttk.Treeview(self.frames["prc"])
 
-        self.process_tree["columns"] = ("name", "cpu", "memory", "prioB", "prioD")
+        self.process_tree["columns"] = ("name", "cpu", "memory", "state", "prioB", "prioD")
         self.process_tree.heading("#0", text="PID")
         self.process_tree.heading("name", text="Nome")
         self.process_tree.heading("cpu", text="CPU")
         self.process_tree.heading("memory", text="Memory")
+        self.process_tree.heading("state", text="State")
         self.process_tree.heading("prioB", text="PrioD")
         self.process_tree.heading("prioD", text="PrioB")
         self.process_tree.column("name", width=60, anchor="center")
         self.process_tree.column("cpu", width=60, anchor="center")
         self.process_tree.column("memory", width=80, anchor="center")
+        self.process_tree.column("state", width=60, anchor="center")
         self.process_tree.column("prioB", width=60, anchor="center")
         self.process_tree.column("prioD", width=60, anchor="center")
         self.process_tree.pack(fill="both", expand=True)
@@ -93,16 +100,16 @@ class Interface:
         self.process_update()
 
     def resources_update(self):
-        data = get_resources()
-
-        self.meters["cpu"].configure(amounttotal=data["cpuSistema"], amountused=data["cpuUso"])
-        self.meters["mem"].configure(amounttotal=data["memTotal"], amountused=data["memUso"])
-        self.meters["memV"].configure(amounttotal=data["memVirtualTotal"], amountused=data["memVirtualUso"])
+        self.gerenciador.atualizaDados()
+        
+        self.meters["cpu"].configure(amounttotal=self.gerenciador._cpuSistema, amountused=self.gerenciador._cpuUso)
+        self.meters["mem"].configure(amounttotal=self.gerenciador._memTotal, amountused=self.gerenciador._memUso)
+        self.meters["memV"].configure(amounttotal=self.gerenciador._memVirtualTotal, amountused=self.gerenciador._memVirtualUso)
 
         
-        self.cpu_chart_frame.update_chart(data["cpuUso"], data["cpuSistema"])
-        self.mem_chart_frame.update_chart(data["memUso"], data["memTotal"])
-        self.memV_chart_frame.update_chart(data["memVirtualUso"], data["memVirtualTotal"])
+        self.cpu_chart_frame.update_chart(self.gerenciador._cpuUso, self.gerenciador._cpuSistema)
+        self.mem_chart_frame.update_chart(self.gerenciador._memUso, self.gerenciador._memTotal)
+        self.memV_chart_frame.update_chart(self.gerenciador._memVirtualUso, self.gerenciador._memVirtualTotal)
 
         self.root.update()
         self.root.after(UPDATE_TIME_MS, self.resources_update)
