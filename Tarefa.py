@@ -32,11 +32,15 @@ class Tarefa():
             fields = f.read().split()
             uptime = float(fields[0])
 
-        with open(f'{self._prefixo}/{self._id}/stat', 'r') as f:
-            fields = f.read().split()
-            utime = int(fields[13]) # Tempo de CPU em modo de usuario
-            stime = int(fields[14]) # Tempo de CPU em modo de sistema
-            starttime = int(fields[21]) # Tempo de inicio do processo
+        try:
+            with open(f'{self._prefixo}/{self._id}/stat', 'r') as f:
+                fields = f.read().split()
+                utime = int(fields[13]) # Tempo de CPU em modo de usuario
+                stime = int(fields[14]) # Tempo de CPU em modo de sistema
+                starttime = int(fields[21]) # Tempo de inicio do processo
+        except Exception as e:
+            self._cpuUso=0
+            return
 
         total_time = utime + stime
         seconds = uptime - (starttime / clk_tck)
@@ -48,7 +52,7 @@ class Tarefa():
             with open(f"{self._prefixo}/{self._id}/comm", "r") as f:
                 self._nome = f.read().strip()
         except FileNotFoundError:
-            print(f"A tarefa com ID {id} não existe ou o arquivo comm não está disponível.")
+            print(f"A tarefa com ID {self._id} não existe ou o arquivo comm não está disponível.")
 
     def _atualizaEstado(self):
         # Estado: campo 2 do /proc/[tid]/stat
@@ -73,15 +77,19 @@ class Tarefa():
         if prio == -1:
             err = ctypes.get_errno()
             if err != 0:
-                raise OSError(err, os.strerror(err))
+                self._prioD = 0
+                #raise OSError(err, os.strerror(err))
         else:
             self._prioD = prio
 
     def _atualizaPrioB(self):
         # Prioridade Base: campo 17 do /proc/[tid]/stat
-        with open(f'{self._prefixo}/{self._id}/stat', 'r') as f:
-            fields = f.read().split()
-            self._prioB = int(fields[17]) # Prioridade estática do processo
+        try:
+            with open(f'{self._prefixo}/{self._id}/stat', 'r') as f:
+                fields = f.read().split()
+                self._prioB = int(fields[17]) # Prioridade estática do processo
+        except Exception as e:
+            self._prioB = 0
     
     def atualizaMem(self, mem):
         self._memUso = mem

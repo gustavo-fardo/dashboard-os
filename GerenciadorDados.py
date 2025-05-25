@@ -51,9 +51,12 @@ class GerenciadorDados():
         self._numProcessos = None
         self._numThreads = None
         threading.Thread(target=self.atualizaDados, args=(True,), daemon=True).start()
+        self._dictlock = threading.Lock()
+        self.atualizaDados(True)
 
     def atualizaDados(self, total=False):
-        self._atualizaProcDict()
+        with self._dictlock:
+            self._atualizaProcDict()
         self._atualizaMemInfo(total=total)
         self._atualizaCPUInfo()
 
@@ -211,55 +214,3 @@ class GerenciadorDados():
         for processo in self._processos.values():
             num_threads += processo.getNumThreads()
         return num_threads
-    
-if __name__ == "__main__":
-    # while True:
-    gerenciador = GerenciadorDados()
-    print("=== Informações de Memória ===")
-    print(f"CPU Sistema: {gerenciador._cpuSistema} %")
-    print(f"CPU Usuário: {gerenciador._cpuUsuario} %")
-    print(f"CPU Nice: {gerenciador._cpuNice} %")
-    print(f"CPU IOWait: {gerenciador._cpuWait} %")
-    print(f"CPU IRQ: {gerenciador._cpuIrq} %")
-    print(f"CPU SoftIRQ: {gerenciador._cpuSoftIrq} %")
-    print(f"CPU Ocioso: {gerenciador._cpuOcioso} %")
-    print(f"CPU Uso: {gerenciador._cpuUso} %")
-    print(f"Memória Total: {gerenciador._memTotal} MB")
-    print(f"Memória Livre: {gerenciador._memLivre} MB")
-    print(f"Memória Cache: {gerenciador._memCache} MB")
-    print(f"Memória Buffer: {gerenciador._memBuffer} MB")
-    print(f"Memória em Uso: {gerenciador._memUso} MB")
-    print(f"Memória Virtual Total: {gerenciador._memVirtualTotal} MB")
-    print(f"Memória Virtual Livre: {gerenciador._memVirtualLivre} MB")
-    print(f"Memória Virtual em Uso: {gerenciador._memVirtualUso} MB")
-    print(f"Memória Virtual em Uso para o Kernel: {gerenciador._memVirtualKernelUso} MB")
-    for pid, processo in gerenciador.getProcDict().items():
-        processo = Processo(pid)
-        print("=== Processo:")
-        print(f"PID: {processo.getID()}")
-        print(f"Nome: {processo.getNome()}")
-        print(f"Prioridade Base: {processo.getPrioB()}")
-        print(f"Prioridade Dinâmica: {processo.getPrioD()}")
-        print(f"Estado: {processo.getEstado()}")
-        print(f"Uso de memoria: {processo.getMem()} KB")
-        print(f"Uso de memoria virtual: {processo.getMemVirt()} KB")
-        print(f"Segmentos de memória:")
-        for segment, info in processo.getMemSegments().items():
-            print(f" - {segment}: {info['size_kb']} KB ({info['pages']} páginas)")
-        print(f"Uso de CPU: {processo.getCPU()} %")
-        print("=== Threads:")
-        for tid, thread in processo.getThreadDict().items():
-            print(f"Thread ID: {tid}")
-            print(f"  Nome: {thread.getNome()}")
-            print(f"  Prioridade Base: {thread.getPrioB()}")
-            print(f"  Prioridade Dinâmica: {thread.getPrioD()}")
-            print(f"  Estado: {thread.getEstado()}")
-            print(f"  Uso de memória: {thread.getMem()} KB")
-            print(f"  Uso de CPU: {thread.getCPU()} %")
-    gerenciador.atualizaDados()
-    # os.system("clear")
-
-
-# # Atualiza os dados continuamente em uma thread separada
-# self.__att_thread = threading.Thread(target=self.__atualizaDadosContinuamente, daemon=True)
-# self.__att_thread.start()
