@@ -2,7 +2,7 @@ import tkinter as tk
 from ttkbootstrap import Style
 from ttkbootstrap.widgets import Meter, LabelFrame
 from tkinter import ttk
-from Chart import AreaChartFrame
+from Chart import LineChartFrame
 from GerenciadorDados import GerenciadorDados
 import threading
 import time
@@ -21,12 +21,14 @@ class Interface:
         self.cur_screen = ""
         self.proc_info_pid = None
 
+        # Limpar janela e encerrar Thread
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.gerenciador = GerenciadorDados()
         
         self.atualiza_thread_running = True
 
+        # Thread para buscar e atualizar dados no objeto do Gerenciador de Dados
         self.atualiza_thread = threading.Thread(target=self.atualiza_thread_func, daemon=True)
         self.atualiza_thread.start()
 
@@ -37,6 +39,7 @@ class Interface:
         self.root.mainloop()
 
     def process_update(self):
+        
         if not self.process_tree.winfo_exists() or self.cur_screen != "process":
             return 
         
@@ -94,6 +97,10 @@ class Interface:
         self.root.after(UI_UPDATE_TIME_MS, self.process_update)
 
     def process_draw(self):
+        """
+            Cria árvore de processos/threads e botão para voltar a tela de recursos.
+            Registra ultima coluna como botão de ação para ver detalhes de um processo
+        """
         self.cur_screen = "process"
         process_button = ttk.Button(self.root, text="View Resources", command=self.redraw_resources)
         process_button.pack(pady=10)
@@ -134,14 +141,18 @@ class Interface:
         self.process_update()
 
     def resources_update(self):
+        """
+            Atualiza medidores e charts com os dados atuais em self.gerenciador em intervalos
+            definidos por UPDATE_TIME_MS
+        """
         if self.cur_screen != "resources":
             return
         
+        # Atualiza valor nos medidores
         self.meters["cpu"].configure(amounttotal=100, amountused=self.gerenciador._cpuUso)
         self.meters["mem"].configure(amounttotal=self.gerenciador._memTotal, amountused=self.gerenciador._memUso)
         self.meters["memV"].configure(amounttotal=self.gerenciador._memVirtualTotal, amountused=self.gerenciador._memVirtualUso)
 
-        
         self.cpu_chart_frame.update_chart(
             [self.gerenciador._cpuUso,
             self.gerenciador._cpuOcioso,
@@ -163,9 +174,11 @@ class Interface:
                 self.gerenciador._memVirtualKernelUso
             ], self.gerenciador._memVirtualTotal)
 
+        # Info de número de threads e processos
         self.process_info.config(text=f"Processes: {self.gerenciador._numProcessos}")
         self.threads_info.config(text=f"Threads: {self.gerenciador.getNumThreads()}")
         
+        # Info de detalhes de CPU
         self.cpu_info["Uso"].config(text=f"Uso: {self.gerenciador._cpuUso:.2f} %")
         self.cpu_info["Ociosas"].config(text=f"Ociosas: {self.gerenciador._cpuOcioso:.2f} %")
         self.cpu_info["Sist."].config(text=f"Sist.: {self.gerenciador._cpuSistema:.2f} %")
@@ -175,11 +188,13 @@ class Interface:
         self.cpu_info["Irq"].config(text=f"Soft Irq: {self.gerenciador._cpuIrq:.2f} %")
         self.cpu_info["Soft Irq"].config(text=f"Soft Irq: {self.gerenciador._cpuSoftIrq:.2f} %")
         
+        # Info de detalhes de RAM
         self.mem_info["Livre"].config(text=f"Livre: {self.gerenciador._memLivre:.2f} MB")
         self.mem_info["Uso"].config(text=f"Uso: {self.gerenciador._memUso:.2f} MB")
         self.mem_info["Buffer"].config(text=f"Buffer: {self.gerenciador._memBuffer:.2f} MB")
         self.mem_info["Cache"].config(text=f"Cache: {self.gerenciador._memCache:.2f} MB")
         
+        # Info de detalhes de VRAM
         self.memv_info["Uso"].config(text=f"Buffer: {self.gerenciador._memVirtualUso:.2f} MB")
         self.memv_info["Kernel Uso"].config(text=f"Cache: {self.gerenciador._memVirtualKernelUso:.2f} MB")
         
@@ -187,6 +202,9 @@ class Interface:
         self.root.after(UI_UPDATE_TIME_MS, self.resources_update)
 
     def resources_draw(self):
+        """
+            Insere frames de medidores/gráficos na janela root para a tela de recursos
+        """
         self.cur_screen = "resources"
         process_button = ttk.Button(self.root, text="View Processes", command=self.redraw_processes)
         process_button.pack(pady=10)
@@ -256,9 +274,9 @@ class Interface:
             self.memv_info[l].pack(anchor='w')
 
 
-        self.cpu_chart_frame = AreaChartFrame(self.frames["cpu"], "CPU Usage (%)", 8, self.cpu_labels)
-        self.mem_chart_frame = AreaChartFrame(self.frames["mem"], "Memory Usage (MB)", 4, self.mem_labels)
-        self.memV_chart_frame = AreaChartFrame(self.frames["memV"], "Virtual Memory Usage (MB)", 2, self.memV_labels)
+        self.cpu_chart_frame = LineChartFrame(self.frames["cpu"], "CPU Usage (%)", 8, self.cpu_labels)
+        self.mem_chart_frame = LineChartFrame(self.frames["mem"], "Memory Usage (MB)", 4, self.mem_labels)
+        self.memV_chart_frame = LineChartFrame(self.frames["memV"], "Virtual Memory Usage (MB)", 2, self.memV_labels)
 
         self.resources_update()
 
@@ -275,6 +293,9 @@ class Interface:
         self.resources_draw()
 
     def clear_widgets(self):
+        """
+        Limpa tela root e reinicializa frames
+        """
         for widget in self.root.winfo_children():
             widget.destroy()
 
@@ -296,17 +317,26 @@ class Interface:
         }
 
     def on_close(self):
+        """
+            Finaliza thread de atualização de dados e fecha janela
+        """
         self.atualiza_thread_running = False
         if self.atualiza_thread.is_alive():
             self.atualiza_thread.join(timeout=1)
         self.root.destroy()
     
     def atualiza_thread_func(self):
+        """
+            Função para atualizar dados do gerenciador periódicamente
+        """
         while self.atualiza_thread_running:
             self.gerenciador.atualizaDados()
             time.sleep(DATA_UPDATE_TIME_S)
             
     def on_treeview_click(self, event):
+        """
+            Callback para click em um elemento da árvore de processos
+        """
         region = self.process_tree.identify_region(event.x, event.y)
         
         if region == "cell":
@@ -323,6 +353,9 @@ class Interface:
                         self.redraw_proc_info()
 
     def draw_proc_info(self):
+        """
+            Insere frame de informações do processo selecionado na tela de processos
+        """
         self.cur_screen = "proc_info"
         process_button = ttk.Button(self.root, text="View Processes", command=self.redraw_processes)
         process_button.pack(pady=10)
@@ -359,6 +392,9 @@ class Interface:
         self.proc_info_update()
             
     def proc_info_update(self):
+        """
+            Atualiza periódicamente dados de processos selecionado
+        """
         if self.cur_screen != "proc_info":
             return 
         
@@ -382,6 +418,8 @@ class Interface:
         self.proc_info["prioD"].config(text=f"prioD: {proc._prioD}")
         
         self.proc_info["memSegments"].config(text=f"Memory Segments:\n{mem_seg_text}")
+
+        self.root.after(UI_UPDATE_TIME_MS, self.proc_info_update)
 
 
 if __name__ == "__main__":

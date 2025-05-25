@@ -3,8 +3,11 @@ from tkinter import ttk
 from ttkbootstrap import Style
 from PIL import Image, ImageTk, ImageDraw
 
-class AreaChartFrame:
+class LineChartFrame:
     def __init__(self, parent, chart_name, num_lines=2, labels=None, width=400, height=200):
+        """
+            Instancia um frame para conter o gráfico de linhas com N linhas definido em num_lines
+        """
         self.style = Style(theme="cyborg")
         self.root = self.style.master
         self.parent = parent
@@ -47,6 +50,9 @@ class AreaChartFrame:
         self.update_chart([0]*num_lines, 100)
 
     def _draw_legend(self):
+        """
+            Cria labels de cor personalizadas para o gráfico
+        """
         for widget in self.legend_frame.winfo_children():
             widget.destroy()
         for idx, label in enumerate(self.line_labels):
@@ -58,8 +64,12 @@ class AreaChartFrame:
             label_widget.pack(side="left", padx=(0, 10))
 
     def update_chart(self, current_values, max_value):
+        """
+            Atualiza gráfico de linhas com valores passados por parâmetro 
+        """
         self.max_value = max([max_value] + current_values + [10])
         
+        # Insere cada valor no array de valores e remove o último
         for i, val in enumerate(current_values):
             if len(self.values[i]) >= self.max_values:
                 self.values[i].pop(0)
@@ -84,6 +94,7 @@ class AreaChartFrame:
             draw.line([(chart_left, y), (chart_right, y)], fill="#000000")
             draw.text((5, y - 10), f"{value}", fill='white')
         
+        # Insere novos pontos para cada linha
         for idx, line_values in enumerate(self.values):
             if len(line_values) > 1:
                 points = []
