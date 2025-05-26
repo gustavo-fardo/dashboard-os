@@ -1,3 +1,13 @@
 ## dashboard-os
+Dashboard para informações de monitoramento do Linux, geral, por processo e por thread.
 
-syscalls cheatsheet: https://www.cheat-sheets.org/saved-copy/Linux_Syscall_quickref.pdf?utm_source=chatgpt.com
+### Dependências
+```bash
+pip install -r requirements.txt
+```
+
+### Execução
+Rodar com privilégio root:
+```bash
+python Interface.py
+```
