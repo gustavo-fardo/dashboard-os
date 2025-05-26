@@ -20,6 +20,7 @@ class Processo(Tarefa):
         super().atualizaDados()
         self._atualizaMemProcesso()
         self._atualizaThreadDict()
+        self._atualizaMemThreads()
 
     def _atualizaThreadDict(self):
         try:
@@ -138,7 +139,7 @@ class Processo(Tarefa):
         return self._numThreads
     
     def getMemVirt(self):
-        return self._memVirtualUso
+        return self._memVirtualUso/1024  # Convertendo para MB
     
     def getMemSegments(self):
         return self._memSegments

@@ -1,6 +1,7 @@
 import ctypes
 import os
 import pwd
+import re
 libc = ctypes.CDLL("libc.so.6", use_errno=True)
 
 # /proc folder ref: https://man7.org/linux/man-pages/man5/proc.5.html
@@ -69,11 +70,15 @@ class Tarefa():
         try:
             with open(f"{self._prefixo}/{self._id}/stat", "r") as f:
                 data = f.read()
-            fields = data.split()
-            self._estado = fields[2]
+                
+            match = re.match(r'^\d+ \((.*?)\) ([A-Z])', data)
+            if match:
+                self._estado = match.group(2)
+            else:
+                print(f"Failed to parse state from: {data}")
         except Exception as e:
             print(f"Error reading {self._prefixo}/{self._id}/stat: {e}")
-
+    
     def _atualizaPrioD(self):
         # Prioridade dinâmica (NICE do linux), pela syscall getpriority
         # REF: https://man7.org/linux/man-pages/man2/setpriority.2.html
@@ -88,7 +93,6 @@ class Tarefa():
             err = ctypes.get_errno()
             if err != 0:
                 self._prioD = 0
-                #raise OSError(err, os.strerror(err))
         else:
             self._prioD = prio
 
@@ -117,7 +121,7 @@ class Tarefa():
         return round(self._cpuUso, 2)
     
     def getMem(self):    
-        return self._memUso
+        return self._memUso/1000
     
     def getEstado(self):    
         return self._estado

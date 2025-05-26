@@ -1,12 +1,8 @@
 from Processo import Processo
 import os
-import ctypes
-import ctypes.util
 import time
 import sys
 import threading
-# Load the C standard library
-libc = ctypes.CDLL(ctypes.util.find_library("c"))
 user_uid = os.getuid()
 
 class GerenciadorDados():
@@ -33,8 +29,7 @@ class GerenciadorDados():
         self._numThreads = None
         self._dictlock = threading.Lock()
         self.atualizaDados(True)
-        threading.Thread(target=self.atualizaDados, args=(True,), daemon=True).start()
-
+        
     def atualizaDados(self, total=False):
         with self._dictlock:
             self._atualizaProcDict()
@@ -57,17 +52,15 @@ class GerenciadorDados():
                 if int(pid) not in self._processos:
                     self._processos[int(pid)] = Processo(pid)
                 else:
-                    self._processos[int(pid)].atualizaDados()
+                    self._processos[int(pid)].atualizaDadosProcesso()
             elif int(pid) in self._processos:
                 del self._processos[int(pid)]
         self._numProcessos = len(self._processos)
 
     def _atualizaMemInfo(self, total=False):
-        # Método utilizado pelo "top" para calcular o uso de memória
         # Utiliza informacoes do /proc/meminfo
         # Memoria Fisica: campos MemTotal, MemFree, Buffers, Cached e SReclaimable
         # Memoria Virtual: campos CommitLimit, Committed_AS e VmallocUsed
-        # REF: https://stackoverflow.com/questions/16726779/how-do-i-get-the-total-memory-usage-of-an-application-from-proc-pid-stat
         meminfo = {}
         try:
             with open('/proc/meminfo', 'r') as f:
@@ -103,7 +96,6 @@ class GerenciadorDados():
     def _atualizaCPUInfo(self):
         # Captura a variacao do uso de CPU em 1s acessando /proc/stat 
         # pelos campos user, nice, system, idle, iowait, irq, softirq
-        # REF: https://www.idnt.net/en-GB/kb/941772
         def ler_cpu_tempos():
             with open('/proc/stat', 'r') as f:
                 for line in f:

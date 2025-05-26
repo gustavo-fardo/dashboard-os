@@ -49,7 +49,6 @@ class Interface:
         with self.gerenciador._dictlock:
             proc_dict = dict(sorted(self.gerenciador.getProcDict().items(), key=lambda item: item[1].getCPU(), reverse=True))
 
-
         for pid, process in proc_dict.items():
             proc_id = str(pid)
             process_ids.add(proc_id)
@@ -131,7 +130,7 @@ class Interface:
         self.process_tree.column("name", width=240, anchor="center")
         self.process_tree.column("user", width=60, anchor="center")
         self.process_tree.column("cpu", width=60, anchor="center")
-        self.process_tree.column("memory", width=80, anchor="center")
+        self.process_tree.column("memory", width=100, anchor="center")
         self.process_tree.column("state", width=60, anchor="center")
         self.process_tree.column("prioB", width=60, anchor="center")
         self.process_tree.column("prioD", width=60, anchor="center")
@@ -402,20 +401,20 @@ class Interface:
         
         mem_seg_text = ""
         for seg_key, seg_val in proc.getMemSegments().items():
-            mem_seg_text += f"        {seg_key}\n                Page: {seg_val['pages']}\n                Size: {seg_val['size_kb']} KB\n"
+            mem_seg_text += f"        {seg_key}\n                Num. Pag.: {seg_val['pages']}\n                Size: {seg_val['size_kb']} KB\n"
         
-        self.proc_info["id"].config(text=f"PID: {proc._id}")
-        self.proc_info["nome"].config(text=f"Name: {proc._nome}")
-        self.proc_info["usuario"].config(text=f"User: {proc._usuario}")
-        self.proc_info["cpuUso"].config(text=f"CPU Use: {proc._cpuUso:.2f}%")
-        self.proc_info["memUso"].config(text=f"RAM Use: {proc._memUso}")
+        self.proc_info["id"].config(text=f"PID: {proc.getID()}")
+        self.proc_info["nome"].config(text=f"Name: {proc.getNome()}")
+        self.proc_info["usuario"].config(text=f"User: {proc.getUsuario()}")
+        self.proc_info["cpuUso"].config(text=f"CPU Use: {proc.getCPU():.2f}%")
+        self.proc_info["memUso"].config(text=f"RAM Use: {proc.getMem():.2f} MB")
         
-        self.proc_info["numThreads"].config(text=f"Threads: {proc._numThreads}")
-        self.proc_info["memVirtualUso"].config(text=f"VRAM: {proc._memVirtualUso} MB")
+        self.proc_info["numThreads"].config(text=f"Threads: {proc.getNumThreads()}")
+        self.proc_info["memVirtualUso"].config(text=f"VRAM: {proc.getMemVirt():.2f} MB")
         
-        self.proc_info["estado"].config(text=f"State: {proc._estado}")
-        self.proc_info["prioB"].config(text=f"prioB: {proc._prioB}")
-        self.proc_info["prioD"].config(text=f"prioD: {proc._prioD}")
+        self.proc_info["estado"].config(text=f"State: {proc.getEstado()}")
+        self.proc_info["prioB"].config(text=f"prioB: {proc.getPrioB()}")
+        self.proc_info["prioD"].config(text=f"prioD: {proc.getPrioD()}")
         
         self.proc_info["memSegments"].config(text=f"Memory Segments:\n{mem_seg_text}")
 
