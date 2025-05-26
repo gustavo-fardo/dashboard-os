@@ -148,54 +148,54 @@ class Interface:
             return
         
         # Atualiza valor nos medidores
-        self.meters["cpu"].configure(amounttotal=100, amountused=self.gerenciador._cpuUso)
-        self.meters["mem"].configure(amounttotal=self.gerenciador._memTotal, amountused=self.gerenciador._memUso)
-        self.meters["memV"].configure(amounttotal=self.gerenciador._memVirtualTotal, amountused=self.gerenciador._memVirtualUso)
+        self.meters["cpu"].configure(amounttotal=100, amountused=self.gerenciador.getCpuUso())
+        self.meters["mem"].configure(amounttotal=self.gerenciador.getMemTotal(), amountused=self.gerenciador.getMemUso())
+        self.meters["memV"].configure(amounttotal=self.gerenciador.getMemVirtualTotal(), amountused=self.gerenciador.getMemVirtualUso())
 
         self.cpu_chart_frame.update_chart(
-            [self.gerenciador._cpuUso,
-            self.gerenciador._cpuOcioso,
-            self.gerenciador._cpuSistema,
-            self.gerenciador._cpuUsuario,
-            self.gerenciador._cpuNice,
-            self.gerenciador._cpuWait,
-            self.gerenciador._cpuIrq,
-            self.gerenciador._cpuSoftIrq], 100)
+            [self.gerenciador.getCpuUso(),
+            self.gerenciador.getCpuOcioso(),
+            self.gerenciador.getCpuSistema(),
+            self.gerenciador.getCpuUsuario(),
+            self.gerenciador.getCpuNice(),
+            self.gerenciador.getCpuWait(),
+            self.gerenciador.getCpuIrq(),
+            self.gerenciador.getCpuSoftIrq()], 100)
         
         self.mem_chart_frame.update_chart([
-            self.gerenciador._memLivre,
-            self.gerenciador._memUso,
-            self.gerenciador._memBuffer,
-            self.gerenciador._memCache], self.gerenciador._memTotal)
+            self.gerenciador.getMemLivre(),
+            self.gerenciador.getMemUso(),
+            self.gerenciador.getMemBuffer(),
+            self.gerenciador.getMemCache()], self.gerenciador.getMemTotal())
         
         self.memV_chart_frame.update_chart([
-                self.gerenciador._memVirtualUso,
-                self.gerenciador._memVirtualKernelUso
-            ], self.gerenciador._memVirtualTotal)
+                self.gerenciador.getMemVirtualLivre(),
+                self.gerenciador.getMemVirtualUso()
+            ], self.gerenciador.getMemVirtualTotal())
 
         # Info de número de threads e processos
-        self.process_info.config(text=f"Processes: {self.gerenciador._numProcessos}")
+        self.process_info.config(text=f"Processes: {self.gerenciador.getNumProcessos()}")
         self.threads_info.config(text=f"Threads: {self.gerenciador.getNumThreads()}")
         
         # Info de detalhes de CPU
-        self.cpu_info["Uso"].config(text=f"Uso: {self.gerenciador._cpuUso:.2f} %")
-        self.cpu_info["Ociosas"].config(text=f"Ociosas: {self.gerenciador._cpuOcioso:.2f} %")
-        self.cpu_info["Sist."].config(text=f"Sist.: {self.gerenciador._cpuSistema:.2f} %")
-        self.cpu_info["Usuario"].config(text=f"Usuario: {self.gerenciador._cpuUsuario:.2f} %")
-        self.cpu_info["Nice"].config(text=f"Nice: {self.gerenciador._cpuNice:.2f} %")
-        self.cpu_info["Wait"].config(text=f"Wait: {self.gerenciador._cpuWait:.2f} %")
-        self.cpu_info["Irq"].config(text=f"Soft Irq: {self.gerenciador._cpuIrq:.2f} %")
-        self.cpu_info["Soft Irq"].config(text=f"Soft Irq: {self.gerenciador._cpuSoftIrq:.2f} %")
+        self.cpu_info["Uso"].config(text=f"Uso: {self.gerenciador.getCpuUso():.2f} %")
+        self.cpu_info["Ociosas"].config(text=f"Ociosas: {self.gerenciador.getCpuOcioso():.2f} %")
+        self.cpu_info["Sist."].config(text=f"Sist.: {self.gerenciador.getCpuSistema():.2f} %")
+        self.cpu_info["Usuario"].config(text=f"Usuario: {self.gerenciador.getCpuUsuario():.2f} %")
+        self.cpu_info["Nice"].config(text=f"Nice: {self.gerenciador.getCpuNice():.2f} %")
+        self.cpu_info["Wait"].config(text=f"Wait: {self.gerenciador.getCpuWait():.2f} %")
+        self.cpu_info["Irq"].config(text=f"Soft Irq: {self.gerenciador.getCpuIrq():.2f} %")
+        self.cpu_info["Soft Irq"].config(text=f"Soft Irq: {self.gerenciador.getCpuSoftIrq():.2f} %")
         
         # Info de detalhes de RAM
-        self.mem_info["Livre"].config(text=f"Livre: {self.gerenciador._memLivre:.2f} MB")
-        self.mem_info["Uso"].config(text=f"Uso: {self.gerenciador._memUso:.2f} MB")
-        self.mem_info["Buffer"].config(text=f"Buffer: {self.gerenciador._memBuffer:.2f} MB")
-        self.mem_info["Cache"].config(text=f"Cache: {self.gerenciador._memCache:.2f} MB")
+        self.mem_info["Livre"].config(text=f"Livre: {self.gerenciador.getMemLivre():.2f} MB")
+        self.mem_info["Uso"].config(text=f"Uso: {self.gerenciador.getMemUso():.2f} MB")
+        self.mem_info["Buffer"].config(text=f"Buffer: {self.gerenciador.getMemBuffer():.2f} MB")
+        self.mem_info["Cache"].config(text=f"Cache: {self.gerenciador.getMemCache():.2f} MB")
         
         # Info de detalhes de VRAM
-        self.memv_info["Uso"].config(text=f"Buffer: {self.gerenciador._memVirtualUso:.2f} MB")
-        self.memv_info["Kernel Uso"].config(text=f"Cache: {self.gerenciador._memVirtualKernelUso:.2f} MB")
+        self.memv_info["Uso"].config(text=f"Buffer: {self.gerenciador.getMemVirtualUso():.2f} MB")
+        self.memv_info["Kernel Uso"].config(text=f"Cache: {self.gerenciador.getMemVirtualKernelUso():.2f} MB")
         
         self.root.update()
         self.root.after(UI_UPDATE_TIME_MS, self.resources_update)
@@ -220,7 +220,7 @@ class Interface:
         self.cpu_proc_frame = ttk.Frame(self.frames["cpu"])
         self.cpu_proc_frame.pack(side="right", padx=10)
         
-        self.process_info = ttk.Label(self.cpu_proc_frame, text=f"Processes: {self.gerenciador._numProcessos}")
+        self.process_info = ttk.Label(self.cpu_proc_frame, text=f"Processes: {self.gerenciador.getNumProcessos()}")
         self.process_info.pack(anchor='w')
         self.threads_info = ttk.Label(self.cpu_proc_frame, text=f"Threads: {self.gerenciador.getNumThreads()}")
         self.threads_info.pack(anchor='w')

@@ -92,7 +92,7 @@ class Processo(Tarefa):
     def _atualizaMemThreads(self):
         # Acessa /proc/PID/task/TID/maps para contar o tamanho do stack individual da thread
         # e soma com a memoria compartilhada do processo com as outras threads
-        total_process_kb = self._memVirtualUso
+        total_process_kb = self._memUso
 
         # Stack por thread
         thread_data = {}
@@ -130,7 +130,10 @@ class Processo(Tarefa):
                 'total_kb': math.ceil(thread_data[tid]['stack_kb'] + thread_shared)
             })
             # Atualiza memoria das threads
-            self._threads[int(tid)].atualizaMem(thread_data[tid]['total_kb'])
+            try:
+                self._threads[int(tid)].atualizaMem(thread_data[tid]['total_kb'])
+            except:
+                print(f"Warning: Thread {tid} in process {self._id} not found")
     
     def getThreadDict(self):
         return self._threads

@@ -20,35 +20,26 @@ class Tarefa():
         self._prioD = None
         self._atualizaNome()
         self._atualizaUsuario()
+        self.atualizaCPU(0)
 
     def atualizaDados(self):
         self._atualizaPrioB()
         self._atualizaPrioD()
         self._atualizaEstado()
-        self._atualizaCPU()
 
-    def _atualizaCPU(self):
-        # Metodo usado pelo comando "top" para calcular o uso de CPU
-        # https://stackoverflow.com/questions/16726779/how-do-i-get-the-total-cpu-usage-of-an-application-from-proc-pid-stat
-        clk_tck = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
-
-        with open(f'/proc/uptime', 'r') as f:
-            fields = f.read().split()
-            uptime = float(fields[0])
-
+    def _capturaCPUUso(self):
+    # Captura o uso de CPU dos processos e threads acessando /proc/[pid]/stat
         try:
             with open(f'{self._prefixo}/{self._id}/stat', 'r') as f:
                 fields = f.read().split()
                 utime = int(fields[13]) # Tempo de CPU em modo de usuario
                 stime = int(fields[14]) # Tempo de CPU em modo de sistema
-                starttime = int(fields[21]) # Tempo de inicio do processo
+                return utime + stime
         except Exception as e:
-            self._cpuUso=0
-            return
+            return None
 
-        total_time = utime + stime
-        seconds = uptime - (starttime / clk_tck)
-        self._cpuUso = 100 * ((total_time / clk_tck) / seconds)
+    def atualizaCPU(self, cpuUso):
+        self._cpuUso = cpuUso
 
     def _atualizaNome(self):
         # Nome: campo 1 do /proc/[tid]/comm
@@ -70,7 +61,7 @@ class Tarefa():
         try:
             with open(f"{self._prefixo}/{self._id}/stat", "r") as f:
                 data = f.read()
-                
+
             match = re.match(r'^\d+ \((.*?)\) ([A-Z])', data)
             if match:
                 self._estado = match.group(2)

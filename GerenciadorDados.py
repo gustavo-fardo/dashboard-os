@@ -29,7 +29,7 @@ class GerenciadorDados():
         self._numThreads = None
         self._dictlock = threading.Lock()
         self.atualizaDados(True)
-        
+
     def atualizaDados(self, total=False):
         with self._dictlock:
             self._atualizaProcDict()
@@ -95,7 +95,11 @@ class GerenciadorDados():
 
     def _atualizaCPUInfo(self):
         # Captura a variacao do uso de CPU em 1s acessando /proc/stat 
-        # pelos campos user, nice, system, idle, iowait, irq, softirq
+        # pelos campos user, nice, system, idle, iowait, irq, softirq para CPU geral
+        # Captura o uso de CPU dos processos e threads acessando /proc/[pid]/stat
+        # pelo uso de CPU em modo de usuario e sistema (utime e stime)
+        # Calcula o delta de uso de CPU em 1s para cada processo e thread
+
         def ler_cpu_tempos():
             with open('/proc/stat', 'r') as f:
                 for line in f:
@@ -105,16 +109,45 @@ class GerenciadorDados():
                         values = list(map(int, parts[1:9]))
                         keys = ['user', 'nice', 'system', 'idle', 'iowait', 'irq', 'softirq', 'steal']
                         return dict(zip(keys, values))
-                
+        
+        def ler_procs_cpu():
+            cpus_p = {}
+            cpus_t_per_p = {}
+            for pid, processo in self._processos.items():
+                cpus_t = {}
+                cpu_time = processo._capturaCPUUso()  # Captura o uso de CPU do processo
+                if cpu_time is not None:
+                    cpus_p[pid] = cpu_time
+                for tid, thread in processo.getThreadDict().items():
+                    cpu_time = thread._capturaCPUUso()  # Captura o uso de CPU do processo
+                    if cpu_time is not None:
+                        cpus_t[tid] = cpu_time
+                cpus_t_per_p[pid] = cpus_t
+            return cpus_p, cpus_t_per_p
+
         t1 = ler_cpu_tempos()
-        time.sleep(1)                           # Sleep for 1 second
+        p1, tr1 = ler_procs_cpu()
+        time.sleep(2)                           # Sleep for 1 second
         t2 = ler_cpu_tempos()
+        p2, tr2 = ler_procs_cpu()
 
         deltas = {}
         total_delta = 0
         for key in t1:
             deltas[key] = t2[key] - t1[key]     # Tempo de CPU por tipo de uso em 1s
             total_delta += deltas[key]          # Total de tempo de CPU usado em 1s
+
+        for pid in p1:
+            if pid in p2:
+                delta = p2[pid] - p1[pid]
+                cpu_percent = (delta / total_delta) * 100
+                self._processos[pid].atualizaCPU(cpu_percent)
+                for tid in tr1[pid]:
+                    if tid in tr2[pid] and tid in tr1[pid]:
+                        delta = tr2[pid][tid] - tr1[pid][tid]
+                        cpu_percent = (delta / total_delta) * 100
+                        threads = self._processos[pid].getThreadDict()
+                        threads[int(tid)].atualizaCPU(cpu_percent)
 
         percentages = {}
         for key in deltas:
@@ -139,6 +172,12 @@ class GerenciadorDados():
     def getMemUso(self):
         return self._memUso
     
+    def getMemBuffer(self):
+        return self._memBuffer
+    
+    def getMemCache(self):
+        return self._memCache
+    
     def getMemVirtualTotal(self):
         return self._memVirtualTotal
     
@@ -148,6 +187,9 @@ class GerenciadorDados():
     def getMemVirtualUso(self):
         return self._memVirtualUso
     
+    def getMemVirtualKernelUso(self):
+        return self._memVirtualKernelUso
+
     def getCpuUso(self):
         return self._cpuUso
     
