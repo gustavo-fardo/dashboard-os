@@ -185,7 +185,7 @@ class Interface:
         self.cpu_info["Usuario"].config(text=f"Usuario: {self.gerenciador.getCpuUsuario():.2f} %")
         self.cpu_info["Nice"].config(text=f"Nice: {self.gerenciador.getCpuNice():.2f} %")
         self.cpu_info["Wait"].config(text=f"Wait: {self.gerenciador.getCpuWait():.2f} %")
-        self.cpu_info["Irq"].config(text=f"Soft Irq: {self.gerenciador.getCpuIrq():.2f} %")
+        self.cpu_info["Irq"].config(text=f"Irq: {self.gerenciador.getCpuIrq():.2f} %")
         self.cpu_info["Soft Irq"].config(text=f"Soft Irq: {self.gerenciador.getCpuSoftIrq():.2f} %")
         
         # Info de detalhes de RAM
