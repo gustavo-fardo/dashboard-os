@@ -101,7 +101,7 @@ class Interface:
             Registra ultima coluna como botão de ação para ver detalhes de um processo
         """
         self.cur_screen = "process"
-        process_button = ttk.Button(self.root, text="View Resources", command=self.redraw_resources)
+        process_button = ttk.Button(self.root, text="Ver Recursos", command=self.redraw_resources)
         process_button.pack(pady=10)
 
         self.frames["prc"].pack(fill="both", expand=True, padx=10, pady=5)
@@ -121,8 +121,8 @@ class Interface:
         self.process_tree.heading("name", text="Nome")
         self.process_tree.heading("user", text="Usuário")
         self.process_tree.heading("cpu", text="CPU (%)")
-        self.process_tree.heading("memory", text="Memory (MB)")
-        self.process_tree.heading("state", text="State")
+        self.process_tree.heading("memory", text="Memória (MB)")
+        self.process_tree.heading("state", text="Estado")
         self.process_tree.heading("prioB", text="PrioD")
         self.process_tree.heading("prioD", text="PrioB")
         self.process_tree.heading("action", text="Detalhes")
@@ -169,13 +169,14 @@ class Interface:
             self.gerenciador.getMemCache()], self.gerenciador.getMemTotal())
         
         self.memV_chart_frame.update_chart([
-                self.gerenciador.getMemVirtualLivre(),
+                self.gerenciador.getMemVirtualTotal(),
+                self.gerenciador.getMemVirtualKernelUso(),
                 self.gerenciador.getMemVirtualUso()
-            ], self.gerenciador.getMemVirtualTotal())
+            ], self.gerenciador.getMemVirtualUso())
 
         # Info de número de threads e processos
-        self.process_info.config(text=f"Processes: {self.gerenciador.getNumProcessos()}")
-        self.threads_info.config(text=f"Threads: {self.gerenciador.getNumThreads()}")
+        self.process_info.config(text=f"Num. Processos: {self.gerenciador.getNumProcessos()}")
+        self.threads_info.config(text=f"Num. Threads: {self.gerenciador.getNumThreads()}")
         
         # Info de detalhes de CPU
         self.cpu_info["Uso"].config(text=f"Uso: {self.gerenciador.getCpuUso():.2f} %")
@@ -194,8 +195,9 @@ class Interface:
         self.mem_info["Cache"].config(text=f"Cache: {self.gerenciador.getMemCache():.2f} MB")
         
         # Info de detalhes de VRAM
-        self.memv_info["Uso"].config(text=f"Buffer: {self.gerenciador.getMemVirtualUso():.2f} MB")
-        self.memv_info["Kernel Uso"].config(text=f"Cache: {self.gerenciador.getMemVirtualKernelUso():.2f} MB")
+        self.memv_info["Limite"].config(text=f"Limite: {self.gerenciador.getMemVirtualTotal():.2f} MB")
+        self.memv_info["Kernel Uso"].config(text=f"Kernel Uso: {self.gerenciador.getMemVirtualKernelUso():.2f} MB")
+        self.memv_info["Requerida"].config(text=f"Requerida: {self.gerenciador.getMemVirtualUso():.2f} MB")
         
         self.root.update()
         self.root.after(UI_UPDATE_TIME_MS, self.resources_update)
@@ -205,7 +207,7 @@ class Interface:
             Insere frames de medidores/gráficos na janela root para a tela de recursos
         """
         self.cur_screen = "resources"
-        process_button = ttk.Button(self.root, text="View Processes", command=self.redraw_processes)
+        process_button = ttk.Button(self.root, text="Ver Processos", command=self.redraw_processes)
         process_button.pack(pady=10)
 
         self.frames["cpu"].pack(fill="x", padx=10)
@@ -253,8 +255,9 @@ class Interface:
         ]
         
         self.memV_labels = [
-            "Uso",
-            "Kernel Uso"
+            "Limite",
+            "Kernel Uso",
+            "Requerida"
         ]
         
         self.mem_info = {}
@@ -273,9 +276,9 @@ class Interface:
             self.memv_info[l].pack(anchor='w')
 
 
-        self.cpu_chart_frame = LineChartFrame(self.frames["cpu"], "CPU Usage (%)", 8, self.cpu_labels)
-        self.mem_chart_frame = LineChartFrame(self.frames["mem"], "Memory Usage (MB)", 4, self.mem_labels)
-        self.memV_chart_frame = LineChartFrame(self.frames["memV"], "Virtual Memory Usage (MB)", 2, self.memV_labels)
+        self.cpu_chart_frame = LineChartFrame(self.frames["cpu"], "Uso CPU (%)", 8, self.cpu_labels)
+        self.mem_chart_frame = LineChartFrame(self.frames["mem"], "Uso de Memória (MB)", 4, self.mem_labels)
+        self.memV_chart_frame = LineChartFrame(self.frames["memV"], "Alocação de Memória Virtual (MB)", 3, self.memV_labels)
 
         self.resources_update()
 
@@ -300,19 +303,19 @@ class Interface:
 
         self.frames = {
             "cpu": LabelFrame(self.root, text="CPU"), 
-            "mem": LabelFrame(self.root, text="Memory"), 
-            "memV": LabelFrame(self.root, text="Virtual Memory"),
-            "prc": LabelFrame(self.root, text="Processes", padding=20),
-            "prc_info": LabelFrame(self.root, text="Process Info", padding=20)
+            "mem": LabelFrame(self.root, text="Memória Física"), 
+            "memV": LabelFrame(self.root, text="Memória Virtual"),
+            "prc": LabelFrame(self.root, text="Processos", padding=20),
+            "prc_info": LabelFrame(self.root, text="Detalhes de Processo", padding=20)
         }
 
         self.meters = {
             "cpu": Meter(self.frames["cpu"], textright='%', metertype='semi',
                  bootstyle='info', subtext='CPU'),
-            "mem": Meter(self.frames["mem"], metertype="semi", textright='mb',
-                 bootstyle="primary", subtext='Memory'),
-            "memV": Meter(self.frames["memV"], metertype="semi", textright='mb',
-                  bootstyle="light", subtext='Virtual Memory')
+            "mem": Meter(self.frames["mem"], metertype="semi", textright='MB',
+                 bootstyle="primary", subtext='Memória Física'),
+            "memV": Meter(self.frames["memV"], metertype="semi", textright='MB',
+                  bootstyle="light", subtext='Memória Virtual Requisitada')
         }
 
     def on_close(self):
@@ -356,7 +359,7 @@ class Interface:
             Insere frame de informações do processo selecionado na tela de processos
         """
         self.cur_screen = "proc_info"
-        process_button = ttk.Button(self.root, text="View Processes", command=self.redraw_processes)
+        process_button = ttk.Button(self.root, text="Ver Processos", command=self.redraw_processes)
         process_button.pack(pady=10)
 
         self.frames["prc_info"].pack(fill="both", expand=True, padx=10, pady=5)
@@ -401,22 +404,22 @@ class Interface:
         
         mem_seg_text = ""
         for seg_key, seg_val in proc.getMemSegments().items():
-            mem_seg_text += f"        {seg_key}\n                Num. Pag.: {seg_val['pages']}\n                Size: {seg_val['size_kb']} KB\n"
+            mem_seg_text += f"        {seg_key}\n                Num. Pag.: {seg_val['pages']}\n                Tamanho: {seg_val['size_kb']} KB\n"
         
         self.proc_info["id"].config(text=f"PID: {proc.getID()}")
-        self.proc_info["nome"].config(text=f"Name: {proc.getNome()}")
-        self.proc_info["usuario"].config(text=f"User: {proc.getUsuario()}")
-        self.proc_info["cpuUso"].config(text=f"CPU Use: {proc.getCPU():.2f}%")
-        self.proc_info["memUso"].config(text=f"RAM Use: {proc.getMem():.2f} MB")
+        self.proc_info["nome"].config(text=f"Nome: {proc.getNome()}")
+        self.proc_info["usuario"].config(text=f"Usuário: {proc.getUsuario()}")
+        self.proc_info["cpuUso"].config(text=f"Uso de CPU: {proc.getCPU():.2f}%")
+        self.proc_info["memUso"].config(text=f"Uso de RAM: {proc.getMem():.2f} MB")
         
         self.proc_info["numThreads"].config(text=f"Threads: {proc.getNumThreads()}")
         self.proc_info["memVirtualUso"].config(text=f"VRAM: {proc.getMemVirt():.2f} MB")
         
-        self.proc_info["estado"].config(text=f"State: {proc.getEstado()}")
-        self.proc_info["prioB"].config(text=f"prioB: {proc.getPrioB()}")
-        self.proc_info["prioD"].config(text=f"prioD: {proc.getPrioD()}")
+        self.proc_info["estado"].config(text=f"Estado: {proc.getEstado()}")
+        self.proc_info["prioB"].config(text=f"Prioridade Base: {proc.getPrioB()}")
+        self.proc_info["prioD"].config(text=f"Prioridade Dinâmica: {proc.getPrioD()}")
         
-        self.proc_info["memSegments"].config(text=f"Memory Segments:\n{mem_seg_text}")
+        self.proc_info["memSegments"].config(text=f"Segmentos de Memória:\n{mem_seg_text}")
 
         self.root.after(UI_UPDATE_TIME_MS, self.proc_info_update)
 
