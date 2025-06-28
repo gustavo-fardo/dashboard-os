@@ -6,6 +6,7 @@ from Chart import LineChartFrame
 from GerenciadorDados import GerenciadorDados
 import threading
 import time
+import posix_ipc
 
 UI_UPDATE_TIME_MS = 1000
 DATA_UPDATE_TIME_S = 0.5
@@ -16,7 +17,10 @@ class Interface:
         self.root = self.style.master
         self.root.title("Dashboard-OS")
         self.root.resizable(True, True)
-        self.root.attributes('-zoomed', True)
+        # self.root.attributes('-zoomed', True)
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        self.root.geometry(f"{int(screen_width*0.9)}x{int(screen_height*0.9)}")
         self.root.minsize(1000, 1000)
         self.cur_screen = ""
         self.proc_info_pid = None
@@ -56,13 +60,15 @@ class Interface:
                 self.process_tree.item(
                     proc_id, text=proc_id, 
                     values=(process.getNome(), process.getUsuario(), process.getCPU(), process.getMem(), 
-                            process.getEstado(), process.getPrioB(), process.getPrioD(), ">>")
+                            process.getEstado(), process.getPrioB(), process.getPrioD(), process.getReadIO(),
+                            process.getWriteIO(), ">>")
                 )
             else:
                 self.process_tree.insert(
                     "", "end", iid=proc_id, text=proc_id, 
                     values=(process.getNome(), process.getUsuario(), process.getCPU(), process.getMem(), 
-                            process.getEstado(), process.getPrioB(), process.getPrioD(), ">>")
+                            process.getEstado(), process.getPrioB(), process.getPrioD(),  process.getReadIO(),
+                            process.getWriteIO(), ">>")
                 )
 
             thread_ids = set()
@@ -116,7 +122,7 @@ class Interface:
         
         self.process_tree.bind('<ButtonRelease-1>', self.on_treeview_click)
 
-        self.process_tree["columns"] = ("name", "user", "cpu", "memory", "state", "prioB", "prioD", "action")
+        self.process_tree["columns"] = ("name", "user", "cpu", "memory", "state", "prioB", "prioD", "leitura", "escrita", "action")
         self.process_tree.heading("#0", text="PID")
         self.process_tree.heading("name", text="Nome")
         self.process_tree.heading("user", text="Usuário")
@@ -125,6 +131,8 @@ class Interface:
         self.process_tree.heading("state", text="Estado")
         self.process_tree.heading("prioB", text="PrioD")
         self.process_tree.heading("prioD", text="PrioB")
+        self.process_tree.heading("leitura", text="Leitura (MB)")
+        self.process_tree.heading("escrita", text="Escrita(MB)")
         self.process_tree.heading("action", text="Detalhes")
         self.process_tree.column("#0", width=100, anchor="center")
         self.process_tree.column("name", width=240, anchor="center")
@@ -134,6 +142,8 @@ class Interface:
         self.process_tree.column("state", width=60, anchor="center")
         self.process_tree.column("prioB", width=60, anchor="center")
         self.process_tree.column("prioD", width=60, anchor="center")
+        self.process_tree.column("leitura", width=100, anchor="center")
+        self.process_tree.column("escrita", width=100, anchor="center")
         self.process_tree.column("action", width=80, anchor="center")
         self.process_tree.pack(fill="both", expand=True)
 
@@ -326,6 +336,7 @@ class Interface:
         if self.atualiza_thread.is_alive():
             self.atualiza_thread.join(timeout=1)
         self.root.destroy()
+        sem.unlink()
     
     def atualiza_thread_func(self):
         """
@@ -368,7 +379,7 @@ class Interface:
             "id", "nome", "usuario", "cpuUso", "memUso", 
             "numThreads", "memVirtualUso", 
             "estado", "prioB", "prioD",
-            "memSegments"
+            "memSegments", "leitura", "escrita"
         ]
         
         self.proc_info = {}
@@ -387,10 +398,94 @@ class Interface:
         self.proc_info["prioD"] = ttk.Label(self.frames["prc_info"])
         
         self.proc_info["memSegments"] = ttk.Label(self.frames["prc_info"])
-        
-        for l in self.proc_labels:
-            self.proc_info[l].pack(anchor='w')
 
+        self.proc_info["leitura"] = ttk.Label(self.frames["prc_info"])
+        self.proc_info["escrita"] = ttk.Label(self.frames["prc_info"])
+
+        # Infos de IO
+        # Main container for both left and right panels
+        container = ttk.Frame(self.frames["prc_info"])
+        container.pack(fill="both", expand=True)
+
+        # Left frame: process info labels
+        left_panel = ttk.Frame(container, width=400)
+        left_panel.pack(side="left", fill="both", padx=10, pady=10)
+
+        # Right frame: IO Tree
+        right_panel = ttk.Frame(container)
+        right_panel.pack(side="right", fill="both", expand=True, padx=50, pady=10)
+
+        # Store labels inside left_panel instead of frames["prc_info"]
+        self.proc_info = {}
+        for key in self.proc_labels:
+            self.proc_info[key] = ttk.Label(left_panel)
+            self.proc_info[key].pack(anchor="w")
+
+        def create_tree(title, height=5):
+            """
+            Helper function to create a treeview with a scrollbar
+            """
+            tree_title = ttk.Label(right_panel, text=title, font=("Segoe UI", 10, "bold"))
+            tree_title.pack(side="top", anchor="w", padx=5, pady=(10, 2))
+
+            tree_container = ttk.Frame(right_panel)
+            tree_container.pack(side="top", fill="both", expand=False)
+
+            tree_scrollbar = ttk.Scrollbar(tree_container, orient="vertical")
+            tree_scrollbar.pack(side="right", fill="y")
+
+            tree = ttk.Treeview(tree_container, height=height, yscrollcommand=tree_scrollbar.set)
+            tree.pack(side="left", fill="both", expand=True)
+
+            tree_scrollbar.config(command=tree.yview)
+            
+            return tree
+
+        # File Tree
+        self.io_tree = create_tree("Recursos Abertos/Alocados", height=10)
+        self.io_tree["columns"] = ("tipo", "caminho")
+        self.io_tree.heading("#0", text="Descritor")
+        self.io_tree.heading("tipo", text="Tipo")
+        self.io_tree.heading("caminho", text="Caminho")
+        self.io_tree.column("#0", width=50, anchor="center")
+        self.io_tree.column("tipo", width=50, anchor="center")
+        self.io_tree.column("caminho", width=100, anchor="w")
+
+        # Socket Tree
+        self.socket_tree = create_tree("Sockets", height=5)
+        self.socket_tree["columns"] = ("tipo", "local", "remoto", "estado")
+        self.socket_tree.heading("#0", text="Descritor")
+        self.socket_tree.heading("tipo", text="Tipo")
+        self.socket_tree.heading("local", text="IP Local")
+        self.socket_tree.heading("remoto", text="IP Remoto")
+        self.socket_tree.heading("estado", text="Estado")
+        self.socket_tree.column("#0", width=50, anchor="center")
+        self.socket_tree.column("tipo", width=50, anchor="center")
+        self.socket_tree.column("local",  width=50, anchor="center")
+        self.socket_tree.column("remoto", width=50, anchor="center")
+        self.socket_tree.column("estado",  width=50, anchor="center")
+
+        # Semaphore Tree
+        self.semaphore_tree = create_tree("Semáforos", height=5)
+        self.semaphore_tree["columns"] = ("dono", "estado", "permissoes")
+        self.semaphore_tree.heading("#0", text="Semáforo")
+        self.semaphore_tree.heading("dono", text="Dono (UID)")
+        self.semaphore_tree.heading("estado", text="Estado")
+        self.semaphore_tree.heading("permissoes", text="Permissões")
+        self.semaphore_tree.column("#0", width=150, anchor="center")
+        self.semaphore_tree.column("dono", width=50, anchor="center")
+        self.semaphore_tree.column("estado", width=50, anchor="center")
+        self.semaphore_tree.column("permissoes", width=100, anchor="center")
+
+        # IO Devices Tree
+        self.io_devices_tree = create_tree("Dispositivos de I/O", height=5)
+        self.io_devices_tree["columns"] = ("path")
+        self.io_devices_tree.heading("#0", text="Descritor")
+        self.io_devices_tree.heading("path", text="Caminho do Dispositivo")
+        self.io_devices_tree.column("#0", width=50, anchor="center")
+        self.io_devices_tree.column("path", width=200, anchor="w")
+
+        self.process_update()
         self.proc_info_update()
             
     def proc_info_update(self):
@@ -421,9 +516,82 @@ class Interface:
         
         self.proc_info["memSegments"].config(text=f"Segmentos de Memória:\n{mem_seg_text}")
 
+        self.proc_info["leitura"].config(text=f"Leitura de Disco: {proc.getReadIO():.2f} MB")
+        self.proc_info["escrita"].config(text=f"Escrita de Disco: {proc.getWriteIO():.2f} MB")
+
+        existing_items = set(self.io_tree.get_children())
+        dictIO = proc.getDictIO()
+
+        # IO Tree
+        for file in dictIO.get("file_descriptors", []):
+            fd = file.get("fd", "")
+            tipo = file.get("type", "Arquivo")
+            path = file.get("real_path", "")
+            if fd in existing_items:
+                self.io_tree.item(
+                    fd, text=fd, 
+                    values=(tipo, path)
+                )
+            else:
+                self.io_tree.insert(
+                    "", "end", iid=fd, text=fd, 
+                    values=(tipo, path)
+                )
+
+        # Socket Tree
+        for socket in dictIO.get("sockets", []):
+            fd = socket.get("fd", "")
+            socket_info = socket.get("info", {})
+            tipo = socket_info.get("proto", "UNIX")
+            local = socket_info.get("local", "")
+            remoto = socket_info.get("remote", "")
+            estado = socket_info.get("state", "")
+            if fd in existing_items:
+                self.socket_tree.item(
+                    fd, text=fd, 
+                    values=(tipo, local, remoto, estado)
+                )
+            else:
+                self.socket_tree.insert(
+                    "", "end", iid=fd, text=fd, 
+                    values=(tipo, local, remoto, estado)
+                )
+
+        # Semaphore Tree
+        for sem in dictIO.get("posix_semaphores", []):
+            sem_name = sem.get("name", "")
+            owner_uid = sem.get("owner_uid", "")
+            state = sem.get("state", "")
+            permissions = sem.get("permissions", "")
+            if sem_name in existing_items:
+                self.semaphore_tree.item(
+                    sem_name, text=sem_name, 
+                    values=(owner_uid, state, permissions)
+                )
+            else:
+                self.semaphore_tree.insert(
+                    "", "end", iid=sem_name, text=sem_name, 
+                    values=(owner_uid, state, permissions)
+                )
+
+        # IO Devices Tree
+        for device in dictIO.get("io_devices", []):
+            fd = device.get("fd", "")
+            device_path = device.get("device_path", "")
+            if fd in existing_items:
+                self.io_devices_tree.item(
+                    fd, text=fd, 
+                    values=(device_path,)
+                )
+            else:
+                self.io_devices_tree.insert(
+                    "", "end", iid=fd, text=fd, 
+                    values=(device_path,)
+                )
+
         self.root.after(UI_UPDATE_TIME_MS, self.proc_info_update)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":    
     app = Interface()
     app.run()
