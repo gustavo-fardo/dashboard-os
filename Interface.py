@@ -7,6 +7,7 @@ from GerenciadorDados import GerenciadorDados
 import threading
 import time
 import posix_ipc
+from FileInfo import FileInfo
 
 UI_UPDATE_TIME_MS = 1000
 DATA_UPDATE_TIME_S = 0.5
@@ -29,6 +30,7 @@ class Interface:
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.gerenciador = GerenciadorDados()
+        self.fileinfo = FileInfo()
         
         self.atualiza_thread_running = True
 
@@ -217,8 +219,16 @@ class Interface:
             Insere frames de medidores/gráficos na janela root para a tela de recursos
         """
         self.cur_screen = "resources"
-        process_button = ttk.Button(self.root, text="Ver Processos", command=self.redraw_processes)
-        process_button.pack(pady=10)
+                
+        top_button_frame = ttk.Frame(self.root)
+        top_button_frame.pack(side="top", pady=10)
+
+        mountinfobutton = ttk.Button(top_button_frame, text="Ver Partições", command=self.redraw_mountinfo)
+        filetree_button = ttk.Button(top_button_frame, text="Navegar nos diretórios", command=self.redraw_filetree)
+        process_button = ttk.Button(top_button_frame, text="Ver Processos", command=self.redraw_processes)
+        mountinfobutton.pack(side="left", padx=10, pady=10)
+        filetree_button.pack(side="left", padx=10, pady=10)
+        process_button.pack(side="left", padx=10, pady=10)
 
         self.frames["cpu"].pack(fill="x", padx=10)
         self.meters["cpu"].pack(side="left", padx=10)
@@ -343,6 +353,9 @@ class Interface:
             Função para atualizar dados do gerenciador periódicamente
         """
         while self.atualiza_thread_running:
+            with self.fileinfo._dictlock:
+                self.fileinfo.mostrar_info_particoes()
+            self.fileinfo.list_dir()
             self.gerenciador.atualizaDados()
             time.sleep(DATA_UPDATE_TIME_S)
             
@@ -590,6 +603,144 @@ class Interface:
                 )
 
         self.root.after(UI_UPDATE_TIME_MS, self.proc_info_update)
+
+    def redraw_filetree(self, reset=True):
+        if reset:
+            self.fileinfo.list_dir("/")
+        self.clear_widgets()
+        self.filetree_draw()
+
+    def filetree_draw(self):
+        """
+            Cria árvore de arquivos e botão para voltar a tela principal
+        """
+        self.cur_screen = "filetree"
+        process_button = ttk.Button(self.root, text="Voltar", command=self.redraw_resources)
+        process_button.pack(pady=10)
+
+        self.frames["prc"].pack(fill="both", expand=True, padx=10, pady=5)
+
+        tree_scrollbar = ttk.Scrollbar(self.frames["prc"], orient="vertical")
+        tree_scrollbar.pack(side="right", fill="y")
+
+        self.file_tree = ttk.Treeview(self.frames["prc"], yscrollcommand=tree_scrollbar.set)
+        tree_scrollbar.config(command=self.file_tree.yview)
+        
+        self.file_tree = ttk.Treeview(self.frames["prc"])
+        
+        self.file_tree.bind('<ButtonRelease-1>', self.onfiletree_click)
+        
+        self.file_tree["columns"] = ("name", "size", "inode", "type")
+        self.file_tree.heading("#0", text="Path")
+        self.file_tree.heading("name", text="Nome")
+        self.file_tree.heading("size", text="Tamanho (bytes)")
+        self.file_tree.heading("inode", text="I Node")
+        self.file_tree.heading("type", text="Tipo")
+        
+        self.file_tree.column("#0")
+        self.file_tree.column("name", width=240)
+        self.file_tree.column("size", width=60)
+        self.file_tree.column("inode", width=60)
+        self.file_tree.column("type", width=100)
+        self.file_tree.pack(fill="both", expand=True)
+
+        self.filetree_update()
+        
+    def filetree_update(self):
+        if not self.file_tree.winfo_exists() or self.cur_screen != "filetree":
+            return 
+        
+        child = self.fileinfo.folder_content
+
+        for fullpath, c in child.items():
+            if fullpath in set(self.file_tree.get_children()):
+                self.file_tree.item(
+                    fullpath, text=fullpath, 
+                    values=(c["fname"], c["size"], c["inode"], c["tipo"]),
+                    tags=[c["fullpath"], c["tipo"]]
+                )
+            else:
+                self.file_tree.insert(
+                    "", "end", iid=fullpath, text=fullpath, 
+                    values=(c["fname"], c["size"], c["inode"], c["tipo"]),
+                    tags=[c["fullpath"], c["tipo"]]
+                )
+                    
+        self.root.update()
+        self.root.after(UI_UPDATE_TIME_MS, self.filetree_update)
+        
+    def onfiletree_click(self, event):
+        """
+            Callback para click em um elemento da árvore de arquivos
+        """
+        item = self.file_tree.identify_row(event.y)
+        
+        if item:
+            tags = self.file_tree.item(item, 'tags')
+            if tags[1] == "DIR":
+                self.fileinfo.list_dir(tags[0])
+                self.redraw_filetree(False)
+
+    def redraw_mountinfo(self):
+        self.clear_widgets()
+        self.mountinfo_draw()
+
+    def mountinfo_draw(self):
+        """
+            Cria árvore de arquivos e botão para voltar a tela principal
+        """
+        self.cur_screen = "mountinfo"
+        process_button = ttk.Button(self.root, text="Voltar", command=self.redraw_resources)
+        process_button.pack(pady=10)
+
+        self.frames["prc"].pack(fill="both", expand=True, padx=10, pady=5)
+
+        tree_scrollbar = ttk.Scrollbar(self.frames["prc"], orient="vertical")
+        tree_scrollbar.pack(side="right", fill="y")
+
+        self.file_tree = ttk.Treeview(self.frames["prc"], yscrollcommand=tree_scrollbar.set)
+        tree_scrollbar.config(command=self.file_tree.yview)
+        
+        self.file_tree = ttk.Treeview(self.frames["prc"])
+        
+        self.file_tree["columns"] = ("device", "mountp", "total", "usado", "disp", "usopct")
+        self.file_tree.heading("device", text="Dispositivo")
+        self.file_tree.heading("mountp", text="Mount Point")
+        self.file_tree.heading("total", text="Total")
+        self.file_tree.heading("usado", text="Usado")
+        self.file_tree.heading("disp", text="Disponível")
+        self.file_tree.heading("usopct", text="Uso (%)")
+        
+        self.file_tree.column("device")
+        self.file_tree.column("mountp")
+        self.file_tree.column("total")
+        self.file_tree.column("usado")
+        self.file_tree.column("disp")
+        self.file_tree.column("usopct")
+        self.file_tree.pack(fill="both", expand=True)
+
+        self.mountinfo_update()
+
+    def mountinfo_update(self):
+        if not self.file_tree.winfo_exists() or self.cur_screen != "mountinfo":
+            return 
+        
+        particoes = self.fileinfo.particoes
+
+        for c in particoes:
+            if c["disp"] in set(self.file_tree.get_children()):
+                self.file_tree.item(
+                    c["disp"], text=c["disp"], 
+                    values=(c["disp"], c["mountp"], c["total"], c["usado"], c["dispo"], c["uso_pct"])
+                )
+            else:
+                self.file_tree.insert(
+                    "", "end", iid=c["disp"], text=c["disp"], 
+                    values=(c["disp"], c["mountp"], c["total"], c["usado"], c["dispo"], c["uso_pct"])
+                )
+                    
+        self.root.update()
+        self.root.after(UI_UPDATE_TIME_MS, self.mountinfo_update)
 
 
 if __name__ == "__main__":    
