@@ -6,7 +6,6 @@ from Chart import LineChartFrame
 from GerenciadorDados import GerenciadorDados
 import threading
 import time
-import posix_ipc
 from FileInfo import FileInfo
 
 UI_UPDATE_TIME_MS = 1000
@@ -325,6 +324,8 @@ class Interface:
             "cpu": LabelFrame(self.root, text="CPU"), 
             "mem": LabelFrame(self.root, text="Memória Física"), 
             "memV": LabelFrame(self.root, text="Memória Virtual"),
+            "finfo": LabelFrame(self.root, text="Diretórios", padding=20),
+            "mount": LabelFrame(self.root, text="Partições", padding=20),
             "prc": LabelFrame(self.root, text="Processos", padding=20),
             "prc_info": LabelFrame(self.root, text="Detalhes de Processo", padding=20),
         }
@@ -617,15 +618,15 @@ class Interface:
         process_button = ttk.Button(self.root, text="Voltar", command=self.redraw_resources)
         process_button.pack(pady=10)
 
-        self.frames["prc"].pack(fill="both", expand=True, padx=10, pady=5)
+        self.frames["finfo"].pack(fill="both", expand=True, padx=10, pady=5)
 
-        tree_scrollbar = ttk.Scrollbar(self.frames["prc"], orient="vertical")
+        tree_scrollbar = ttk.Scrollbar(self.frames["finfo"], orient="vertical")
         tree_scrollbar.pack(side="right", fill="y")
 
-        self.file_tree = ttk.Treeview(self.frames["prc"], yscrollcommand=tree_scrollbar.set)
+        self.file_tree = ttk.Treeview(self.frames["finfo"], yscrollcommand=tree_scrollbar.set)
         tree_scrollbar.config(command=self.file_tree.yview)
         
-        self.file_tree = ttk.Treeview(self.frames["prc"])
+        self.file_tree = ttk.Treeview(self.frames["finfo"])
         
         self.file_tree.bind('<ButtonRelease-1>', self.onfiletree_click)
         
@@ -692,15 +693,15 @@ class Interface:
         process_button = ttk.Button(self.root, text="Voltar", command=self.redraw_resources)
         process_button.pack(pady=10)
 
-        self.frames["prc"].pack(fill="both", expand=True, padx=10, pady=5)
+        self.frames["mount"].pack(fill="both", expand=True, padx=10, pady=5)
 
-        tree_scrollbar = ttk.Scrollbar(self.frames["prc"], orient="vertical")
+        tree_scrollbar = ttk.Scrollbar(self.frames["mount"], orient="vertical")
         tree_scrollbar.pack(side="right", fill="y")
 
-        self.file_tree = ttk.Treeview(self.frames["prc"], yscrollcommand=tree_scrollbar.set)
+        self.file_tree = ttk.Treeview(self.frames["mount"], yscrollcommand=tree_scrollbar.set)
         tree_scrollbar.config(command=self.file_tree.yview)
         
-        self.file_tree = ttk.Treeview(self.frames["prc"])
+        self.file_tree = ttk.Treeview(self.frames["mount"])
         
         self.file_tree["columns"] = ("mountp", "total", "usado", "disp", "usopct")
         self.file_tree.heading("#0", text="Disposivo")
