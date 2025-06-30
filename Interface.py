@@ -326,7 +326,7 @@ class Interface:
             "mem": LabelFrame(self.root, text="Memória Física"), 
             "memV": LabelFrame(self.root, text="Memória Virtual"),
             "prc": LabelFrame(self.root, text="Processos", padding=20),
-            "prc_info": LabelFrame(self.root, text="Detalhes de Processo", padding=20)
+            "prc_info": LabelFrame(self.root, text="Detalhes de Processo", padding=20),
         }
 
         self.meters = {
@@ -346,7 +346,6 @@ class Interface:
         if self.atualiza_thread.is_alive():
             self.atualiza_thread.join(timeout=1)
         self.root.destroy()
-        sem.unlink()
     
     def atualiza_thread_func(self):
         """
@@ -703,15 +702,15 @@ class Interface:
         
         self.file_tree = ttk.Treeview(self.frames["prc"])
         
-        self.file_tree["columns"] = ("device", "mountp", "total", "usado", "disp", "usopct")
-        self.file_tree.heading("device", text="Dispositivo")
+        self.file_tree["columns"] = ("mountp", "total", "usado", "disp", "usopct")
+        self.file_tree.heading("#0", text="Disposivo")
         self.file_tree.heading("mountp", text="Mount Point")
         self.file_tree.heading("total", text="Total")
         self.file_tree.heading("usado", text="Usado")
         self.file_tree.heading("disp", text="Disponível")
         self.file_tree.heading("usopct", text="Uso (%)")
         
-        self.file_tree.column("device")
+        self.file_tree.column("#0")
         self.file_tree.column("mountp")
         self.file_tree.column("total")
         self.file_tree.column("usado")
@@ -731,12 +730,12 @@ class Interface:
             if c["disp"] in set(self.file_tree.get_children()):
                 self.file_tree.item(
                     c["disp"], text=c["disp"], 
-                    values=(c["disp"], c["mountp"], c["total"], c["usado"], c["dispo"], c["uso_pct"])
+                    values=(c["mountp"], c["total"], c["usado"], c["dispo"], c["uso_pct"])
                 )
             else:
                 self.file_tree.insert(
                     "", "end", iid=c["disp"], text=c["disp"], 
-                    values=(c["disp"], c["mountp"], c["total"], c["usado"], c["dispo"], c["uso_pct"])
+                    values=(c["mountp"], c["total"], c["usado"], c["dispo"], c["uso_pct"])
                 )
                     
         self.root.update()

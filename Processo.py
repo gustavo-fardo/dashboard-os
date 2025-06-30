@@ -282,7 +282,7 @@ class Processo(Tarefa):
                                 "state": state
                             }
             except FileNotFoundError:
-                pass  # some systems don't have udp or unix
+                pass
             return connections
 
         all_sockets = {}
